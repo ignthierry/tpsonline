@@ -4,6 +4,35 @@
  * Memuat konfigurasi dari file .env secara otomatis
  */
 
+// ===== PHP 7.x Compatibility Polyfills =====
+if (!function_exists('str_starts_with')) {
+    function str_starts_with(?string $haystack, ?string $needle): bool
+    {
+        if ($needle === null || $needle === '') return true;
+        if ($haystack === null) return false;
+        return strpos($haystack, $needle) === 0;
+    }
+}
+
+if (!function_exists('str_ends_with')) {
+    function str_ends_with(?string $haystack, ?string $needle): bool
+    {
+        if ($needle === null || $needle === '') return true;
+        if ($haystack === null) return false;
+        $len = strlen($needle);
+        return substr($haystack, -$len) === $needle;
+    }
+}
+
+if (!function_exists('str_contains')) {
+    function str_contains(?string $haystack, ?string $needle): bool
+    {
+        if ($needle === null || $needle === '') return true;
+        if ($haystack === null) return false;
+        return strpos($haystack, $needle) !== false;
+    }
+}
+
 if (!function_exists('loadEnv')) {
     function loadEnv(string $path): array
     {
@@ -15,20 +44,21 @@ if (!function_exists('loadEnv')) {
         $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             $line = trim($line);
-            if (empty($line) || str_starts_with($line, '#')) {
+            if (empty($line) || $line[0] === '#') {
                 continue;
             }
 
             if (strpos($line, '=') !== false) {
-                [$key, $value] = explode('=', $line, 2);
+                list($key, $value) = explode('=', $line, 2);
                 $key = trim($key);
                 $value = trim($value);
 
-                if (
-                    (str_starts_with($value, '"') && str_ends_with($value, '"')) ||
-                    (str_starts_with($value, "'") && str_ends_with($value, "'"))
-                ) {
-                    $value = substr($value, 1, -1);
+                $len = strlen($value);
+                if ($len >= 2) {
+                    if (($value[0] === '"' && $value[$len - 1] === '"') ||
+                        ($value[0] === "'" && $value[$len - 1] === "'")) {
+                        $value = substr($value, 1, -1);
+                    }
                 }
 
                 $env[$key] = $value;

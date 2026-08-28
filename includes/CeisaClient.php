@@ -7,14 +7,14 @@
 
 class CeisaClient
 {
-    private string $baseUrl;
-    private string $authUrl;
-    private string $apiKey;
-    private string $username;
-    private string $password;
-    private int $timeout;
-    private bool $verifySSL;
-    private string $cacheFile;
+    private $baseUrl;
+    private $authUrl;
+    private $apiKey;
+    private $username;
+    private $password;
+    private $timeout;
+    private $verifySSL;
+    private $cacheFile;
 
     public function __construct()
     {
