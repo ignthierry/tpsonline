@@ -947,16 +947,45 @@ ffmpeg -i "rtsp://admin:Admin123@192.168.1.101:554/Streaming/Channels/101" -f mp
             wrapper.innerHTML = `
                 <img src="${dataUrl}" style="width: 100%; height: 124px; object-fit: cover; display: block;" alt="Motion Snapshot">
                 <div style="padding: 10px; text-align: center; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; color: #ef4444; font-weight: bold; background: rgba(0,0,0,0.3);">
-                    ⚠️ ${timeStr}
+                    ⚠️ ${timeStr} <span class="sync-status" style="font-size:0.7rem; color:#94a3b8; display:block;">Saving...</span>
                 </div>
             `;
             
             gallery.prepend(wrapper);
             
-            // Keep only the last 20 snapshots (1 minute of activity)
+            // Keep only the last 20 snapshots in UI
             while (gallery.children.length > 20) {
                 gallery.removeChild(gallery.lastChild);
             }
+
+            // Save to Server
+            fetch('api/save_snapshot.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image: dataUrl,
+                    channel: state.channel
+                })
+            }).then(r => r.json()).then(res => {
+                const statusSpan = wrapper.querySelector('.sync-status');
+                if (res.status === 'success') {
+                    if (statusSpan) {
+                        statusSpan.textContent = 'Saved to disk';
+                        statusSpan.style.color = '#22c55e';
+                    }
+                } else {
+                    if (statusSpan) {
+                        statusSpan.textContent = 'Save failed';
+                        statusSpan.style.color = '#ef4444';
+                    }
+                }
+            }).catch(e => {
+                const statusSpan = wrapper.querySelector('.sync-status');
+                if (statusSpan) {
+                    statusSpan.textContent = 'Network error';
+                    statusSpan.style.color = '#ef4444';
+                }
+            });
         }
 
         function renderCanvasFrame() {
