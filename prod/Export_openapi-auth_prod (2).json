@@ -1,0 +1,54 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "title" : "openapi-auth",
+    "description" : "API CEISA 4.0 Host to Host Authentication (Versi 1.0)",
+    "termsOfService" : "customs.go.id",
+    "contact" : {
+      "name" : "CEISA 4.0 Development Team",
+      "url" : "https://beacukai.go.id - IG : @tasyaceisacare",
+      "email" : "https://ceisacare.beacukai.go.id"
+    },
+    "license" : {
+      "name" : "For internal usage only",
+      "url" : "beacukai.go.id"
+    },
+    "version" : "1"
+  },
+  "servers" : [ {
+    "url" : "https://apis-gw.beacukai.go.id/v1/openapi-auth"
+  } ],
+  "paths" : {
+    "/user/login" : {
+      "summary" : "",
+      "description" : "",
+      "post" : {
+        "summary" : "",
+        "description" : "",
+        "operationId" : "POST",
+        "responses" : {
+          "default" : {
+            "description" : "Default"
+          }
+        },
+        "security" : [ { } ]
+      }
+    },
+    "/user/update-token" : {
+      "summary" : "",
+      "description" : "",
+      "post" : {
+        "summary" : "",
+        "description" : "",
+        "operationId" : "POST",
+        "responses" : {
+          "default" : {
+            "description" : "Default"
+          }
+        },
+        "security" : [ { } ]
+      }
+    }
+  },
+  "components" : { }
+}

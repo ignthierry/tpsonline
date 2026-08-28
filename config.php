@@ -1,0 +1,81 @@
+<?php
+/**
+ * Konfigurasi API TPS Online H2H - CEISA 4.0
+ * Memuat konfigurasi dari file .env secara otomatis
+ */
+
+if (!function_exists('loadEnv')) {
+    function loadEnv(string $path): array
+    {
+        $env = [];
+        if (!file_exists($path)) {
+            return $env;
+        }
+
+        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line) || str_starts_with($line, '#')) {
+                continue;
+            }
+
+            if (strpos($line, '=') !== false) {
+                [$key, $value] = explode('=', $line, 2);
+                $key = trim($key);
+                $value = trim($value);
+
+                if (
+                    (str_starts_with($value, '"') && str_ends_with($value, '"')) ||
+                    (str_starts_with($value, "'") && str_ends_with($value, "'"))
+                ) {
+                    $value = substr($value, 1, -1);
+                }
+
+                $env[$key] = $value;
+                putenv("$key=$value");
+                $_ENV[$key] = $value;
+            }
+        }
+        return $env;
+    }
+}
+
+if (!function_exists('env')) {
+    function env(string $key, $default = null) {
+        $val = getenv($key);
+        if ($val !== false) {
+            return $val;
+        }
+        return $_ENV[$key] ?? $default;
+    }
+}
+
+// Muat .env
+loadEnv(__DIR__ . '/.env');
+
+return [
+    // ===== API CEISA Configuration =====
+    'base_url' => env('CEISA_BASE_URL', 'https://sandbox-gw.beacukai.go.id/v1/openapi-tps'),
+    'auth_url' => env('CEISA_AUTH_URL', 'https://sandbox-gw.beacukai.go.id/v1/openapi-auth/user/login'),
+    
+    // Header beacukai-api-key
+    'api_key'  => env('CEISA_API_KEY', '06dd91f2-0979-4209-b4e3-93a7d1b248a4'),
+    
+    // Kredensial login API CEISA
+    'username' => env('CEISA_USERNAME', 'itprimamas'),
+    'password' => env('CEISA_PASSWORD', 'Psuit@2025'),
+    
+    // ===== Session Configuration =====
+    'session_name' => 'ceisa4_dashboard',
+    'session_lifetime' => 28800, // 8 jam dalam detik
+    
+    // ===== Application Settings =====
+    'app_name' => env('APP_NAME', 'CEISA 4.0 — TPS Online Dashboard'),
+    'app_version' => '1.0.0',
+    'timezone' => env('TIMEZONE', 'Asia/Jakarta'),
+    'auto_auth' => true, // Auto login via ENV (langsung ke dashboard)
+    
+    // ===== cURL Settings =====
+    'curl_timeout' => 45,        // timeout dalam detik
+    'curl_verify_ssl' => filter_var(env('CURL_VERIFY_SSL', 'false'), FILTER_VALIDATE_BOOLEAN),
+];
