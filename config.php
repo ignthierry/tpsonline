@@ -59,7 +59,7 @@ return [
     'auth_url' => env('CEISA_AUTH_URL', 'https://sandbox-gw.beacukai.go.id/v1/openapi-auth/user/login'),
     
     // Header beacukai-api-key
-    'api_key'  => env('CEISA_API_KEY', '06dd91f2-0979-4209-b4e3-93a7d1b248a4'),
+    'api_key'  => env('CEISA_API_KEY', '64dd6fdb-25cf-4985-9b8f-982feb00d6dd'),
     
     // Kredensial login API CEISA
     'username' => env('CEISA_USERNAME', 'itprimamas'),

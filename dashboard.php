@@ -25,6 +25,12 @@ $userInitial = strtoupper(substr($username, 0, 2));
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/style.css?v=<?= time() ?>">
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('ceisa_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
 <body data-login-time="<?= $loginTime ?>">
     <!-- Endpoint Definitions for JS -->
@@ -88,6 +94,10 @@ $userInitial = strtoupper(substr($username, 0, 2));
                     </div>
                 </div>
                 <div class="header-right">
+                    <button class="theme-toggle" id="theme-toggle" title="Ubah Mode (Gelap / Terang)" aria-label="Toggle theme">
+                        <span class="theme-toggle-icon">🌙</span>
+                        <span class="theme-toggle-text">Dark</span>
+                    </button>
                     <div class="api-badge" title="Header beacukai-api-key aktif">
                         <span class="dot"></span>
                         <span>API Key Active</span>

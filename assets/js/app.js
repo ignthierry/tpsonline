@@ -26,8 +26,61 @@
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => document.querySelectorAll(sel);
 
+    // ===== Theme Management =====
+    const THEME_STORAGE_KEY = 'ceisa_theme';
+
+    function getPreferredTheme() {
+        const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+        if (storedTheme) {
+            return storedTheme;
+        }
+        return 'dark'; // default theme
+    }
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        updateThemeToggleUI(theme);
+    }
+
+    function setTheme(theme) {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+        applyTheme(theme);
+    }
+
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || getPreferredTheme();
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+        showToast(newTheme === 'dark' ? '🌙 Mode Gelap diaktifkan' : '☀️ Mode Terang diaktifkan', 'info');
+    }
+
+    function updateThemeToggleUI(theme) {
+        const isDark = theme === 'dark';
+        document.querySelectorAll('.theme-toggle, .theme-toggle-floating').forEach((btn) => {
+            const icon = btn.querySelector('.theme-toggle-icon');
+            const text = btn.querySelector('.theme-toggle-text');
+            if (icon) icon.textContent = isDark ? '🌙' : '☀️';
+            if (text) text.textContent = isDark ? 'Dark' : 'Light';
+            btn.setAttribute('title', isDark ? 'Ubah ke Mode Terang' : 'Ubah ke Mode Gelap');
+        });
+    }
+
+    function setupThemeToggle() {
+        const preferred = getPreferredTheme();
+        applyTheme(preferred);
+
+        document.querySelectorAll('.theme-toggle, .theme-toggle-floating').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                toggleTheme();
+            });
+        });
+    }
+
     // ===== Initialize =====
     function init() {
+        setupThemeToggle();
+
         // Parse endpoint definitions embedded in the page
         const defEl = document.getElementById('endpoint-definitions');
         if (defEl) {
@@ -724,6 +777,9 @@
         closeJSON,
         clearForm,
         showToast,
+        toggleTheme,
+        setTheme,
+        getPreferredTheme,
     };
 
     // Auto-init when DOM ready

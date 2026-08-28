@@ -24,8 +24,19 @@ if (isLoggedIn() || !empty($config['auto_auth'])) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/style.css?v=<?= time() ?>">
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('ceisa_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
 <body class="login-page">
+    <button class="theme-toggle-floating" id="theme-toggle" onclick="toggleTheme()" title="Ubah Mode (Gelap / Terang)" aria-label="Toggle theme">
+        <span class="theme-toggle-icon" id="theme-toggle-icon">🌙</span>
+        <span class="theme-toggle-text" id="theme-toggle-text">Dark</span>
+    </button>
+
     <div class="login-card">
         <div class="login-logo">
             <div class="logo-icon">🏛️</div>
@@ -117,6 +128,28 @@ if (isLoggedIn() || !empty($config['auto_auth'])) {
             alert.textContent = message;
             alert.className = 'login-alert ' + type + ' visible';
         }
+
+        // Theme Toggle on Login Page
+        function updateThemeUI(theme) {
+            const isDark = theme === 'dark';
+            const icon = document.getElementById('theme-toggle-icon');
+            const text = document.getElementById('theme-toggle-text');
+            const btn = document.getElementById('theme-toggle');
+            if (icon) icon.textContent = isDark ? '🌙' : '☀️';
+            if (text) text.textContent = isDark ? 'Dark' : 'Light';
+            if (btn) btn.setAttribute('title', isDark ? 'Ubah ke Mode Terang' : 'Ubah ke Mode Gelap');
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            const next = current === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('ceisa_theme', next);
+            document.documentElement.setAttribute('data-theme', next);
+            updateThemeUI(next);
+        }
+
+        // Initial UI sync
+        updateThemeUI(document.documentElement.getAttribute('data-theme') || 'dark');
     </script>
 </body>
 </html>
