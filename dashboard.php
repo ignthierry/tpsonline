@@ -61,6 +61,15 @@ $userInitial = strtoupper(substr($username, 0, 2));
                     </div>
                 </div>
 
+                <!-- CCTV Monitoring -->
+                <div class="nav-section">
+                    <a href="cctv.php" class="nav-item" style="text-decoration:none; color:inherit;">
+                        <span class="nav-icon">📹</span>
+                        <span>CCTV Live Stream</span>
+                        <span class="nav-badge" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">LIVE</span>
+                    </a>
+                </div>
+
                 <!-- Dynamic Categories -->
                 <?php foreach ($endpoints as $catKey => $category): ?>
                 <div class="nav-section">
