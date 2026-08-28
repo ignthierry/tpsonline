@@ -9,7 +9,7 @@ $config = require __DIR__ . '/config.php';
 
 // Jika auto_auth aktif atau sudah login, langsung ke dashboard tanpa perlu login manual
 if (isLoggedIn() || !empty($config['auto_auth'])) {
-    header('Location: /dashboard.php');
+    header('Location: dashboard.php');
     exit;
 }
 ?>
@@ -23,7 +23,7 @@ if (isLoggedIn() || !empty($config['auto_auth'])) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/style.css?v=<?= time() ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?= time() ?>">
     <script>
         (function() {
             const savedTheme = localStorage.getItem('ceisa_theme') || 'dark';
@@ -94,7 +94,7 @@ if (isLoggedIn() || !empty($config['auto_auth'])) {
             alert.classList.remove('visible');
 
             try {
-                const response = await fetch('/api/auth.php', {
+                const response = await fetch('api/auth.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password }),
@@ -105,7 +105,7 @@ if (isLoggedIn() || !empty($config['auto_auth'])) {
                 if (data.success) {
                     showAlert(data.message, 'success');
                     setTimeout(() => {
-                        window.location.href = '/dashboard.php';
+                        window.location.href = 'dashboard.php';
                     }, 1000);
                 } else {
                     showAlert(data.message || 'Login gagal', 'error');

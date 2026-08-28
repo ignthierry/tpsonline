@@ -62,7 +62,7 @@ function requireAuth(): void
                 // Biarkan lanjut atau redirect
             }
         }
-        header('Location: /index.php');
+        header('Location: index.php');
         exit;
     }
 }

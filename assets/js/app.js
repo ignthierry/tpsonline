@@ -389,7 +389,7 @@
         text.textContent = 'Mengambil data...';
 
         try {
-            const response = await fetch(`/api/proxy.php?${params.toString()}`);
+            const response = await fetch(`api/proxy.php?${params.toString()}`);
             const data = await response.json();
 
             state.lastResponse = data;
@@ -397,7 +397,7 @@
             if (data.token_expired) {
                 showToast('Sesi Anda telah berakhir. Mengalihkan ke halaman login...', 'error');
                 setTimeout(() => {
-                    window.location.href = '/index.php';
+                    window.location.href = 'index.php';
                 }, 2000);
                 return;
             }
@@ -677,7 +677,7 @@
         }
 
         try {
-            const response = await fetch('/api/export.php', {
+            const response = await fetch('api/export.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

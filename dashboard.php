@@ -24,7 +24,7 @@ $userInitial = strtoupper(substr($username, 0, 2));
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/style.css?v=<?= time() ?>">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?= time() ?>">
     <script>
         (function() {
             const savedTheme = localStorage.getItem('ceisa_theme') || 'dark';
@@ -109,7 +109,7 @@ $userInitial = strtoupper(substr($username, 0, 2));
                     <div class="header-user">
                         <div class="user-avatar"><?= e($userInitial) ?></div>
                         <span><?= e($username) ?></span>
-                        <a href="/logout.php" title="Keluar dari sistem" style="color:var(--accent-red); margin-left:6px; font-size:0.9rem; text-decoration:none; opacity:0.8; transition:0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.8">🚪</a>
+                        <a href="logout.php" title="Keluar dari sistem" style="color:var(--accent-red); margin-left:6px; font-size:0.9rem; text-decoration:none; opacity:0.8; transition:0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.8">🚪</a>
                     </div>
                 </div>
             </header>
@@ -138,12 +138,12 @@ $userInitial = strtoupper(substr($username, 0, 2));
     <div class="toast-container" id="toast-container"></div>
 
     <!-- App Script -->
-    <script src="/assets/js/app.js"></script>
+    <script src="assets/js/app.js"></script>
     <script>
         async function refreshAccessToken() {
             try {
                 CeisaApp.showToast('Memperbarui token dari SSO Bea Cukai...', 'info');
-                const res = await fetch('/api/auth.php', {
+                const res = await fetch('api/auth.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ refresh: true })
