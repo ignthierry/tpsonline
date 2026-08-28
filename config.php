@@ -108,4 +108,16 @@ return [
     // ===== cURL Settings =====
     'curl_timeout' => 45,        // timeout dalam detik
     'curl_verify_ssl' => filter_var(env('CURL_VERIFY_SSL', 'false'), FILTER_VALIDATE_BOOLEAN),
+
+    // ===== Database Settings =====
+    'db' => [
+        'host' => env('DB_HOST', '192.168.0.192'),
+        'user' => env('DB_USER', 'itpsu'),
+        'pass' => env('DB_PASS', '123123'),
+        'names' => [
+            'tpsonline' => env('DB_NAME_TPSONLINE', 'tpsonline'),
+            'tpp'       => env('DB_NAME_TPP', 'tpp_primamas'),
+            'primamas'  => env('DB_NAME_PRIMAMAS', 'primamas'),
+        ]
+    ],
 ];
