@@ -111,9 +111,9 @@ return [
 
     // ===== Database Settings =====
     'db' => [
-        'host' => env('DB_HOST', '192.168.0.192'),
-        'user' => env('DB_USER', 'itpsu'),
-        'pass' => env('DB_PASS', '123123'),
+        'host' => env('DB_HOST', '100.90.187.128'),
+        'user' => env('DB_USER', 'luna'),
+        'pass' => env('DB_PASS', 'N2145tb@'),
         'names' => [
             'tpsonline' => env('DB_NAME_TPSONLINE', 'tpsonline'),
             'tpp'       => env('DB_NAME_TPP', 'tpp_primamas'),

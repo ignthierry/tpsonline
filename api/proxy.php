@@ -34,11 +34,9 @@ unset($params['endpoint']);
 $client = new CeisaClient();
 $result = $client->get($endpoint, $params);
 
-// Sinkronisasi data ke database jika sukses
-if ($result['success'] && isset($result['data']['data']) && is_array($result['data']['data'])) {
-    require_once __DIR__ . '/../includes/db_sync.php';
-    syncToDatabase($endpoint, $result['data']['data']);
-}
+// Simpan seluruh return / respon GET ke database (Log + Tabel Spesifik)
+require_once __DIR__ . '/../includes/db_sync.php';
+saveGetApiResponse($endpoint, $params, $result);
 
 // Return response
 $statusCode = $result['success'] ? 200 : ($result['code'] ?: 500);

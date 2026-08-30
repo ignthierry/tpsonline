@@ -446,10 +446,15 @@
     }
 
     function normalizeData(data) {
+        if (!data) return [];
+
         // If data is a single object (not array), wrap it
         if (!Array.isArray(data) && typeof data === 'object') {
             // Check if it has a known wrapper key
-            const wrapperKeys = ['responPlp', 'responBatal', 'items', 'dokumen', 'list'];
+            const wrapperKeys = [
+                'sppb', 'dokumenPabean', 'responPlp', 'responBatalPlp', 'responBatal',
+                'spjm', 'npe', 'peb', 'pkbe', 'sp3b', 'items', 'dokumen', 'list', 'data', 'rows'
+            ];
             for (const key of wrapperKeys) {
                 if (data[key] && Array.isArray(data[key])) {
                     return flattenNestedObjects(data[key]);
@@ -484,18 +489,25 @@
     function flattenObject(obj, prefix = '') {
         const result = {};
         for (const [key, value] of Object.entries(obj)) {
+            // Jika ada key 'header' di level root, ratakan propertinya langsung agar kolom tabel bersih
+            if (key === 'header' && !prefix && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                Object.assign(result, flattenObject(value, ''));
+                continue;
+            }
+
             const newKey = prefix ? `${prefix}.${key}` : key;
             if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
                 Object.assign(result, flattenObject(value, newKey));
             } else if (Array.isArray(value)) {
-                // For arrays, store as JSON string or expand first item
                 if (value.length > 0 && typeof value[0] === 'object') {
                     result[newKey] = `[${value.length} items]`;
+                } else if (value.length === 0) {
+                    result[newKey] = '-';
                 } else {
                     result[newKey] = value.join(', ');
                 }
             } else {
-                result[newKey] = value;
+                result[newKey] = value !== null && value !== undefined && value !== '' ? value : '-';
             }
         }
         return result;
