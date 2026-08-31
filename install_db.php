@@ -401,6 +401,72 @@ $tables = [
             raw_data JSON,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ",
+
+    // 18. PLP On-Demand Header
+    'ceisa_plp_header' => "
+        CREATE TABLE IF NOT EXISTS ceisa_plp_header (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            idTpsPlp VARCHAR(50),
+            nomorPlp VARCHAR(50),
+            tanggalPlp VARCHAR(50),
+            alasanReject TEXT,
+            nomorSurat VARCHAR(50),
+            tanggalSurat VARCHAR(50),
+            nomorBc11 VARCHAR(50),
+            tanggalBc11 VARCHAR(50),
+            kodeKantor VARCHAR(20),
+            kodeTpsAsal VARCHAR(20),
+            kodeTpsTujuan VARCHAR(20),
+            kodeGudangAsal VARCHAR(20),
+            kodeGudangTujuan VARCHAR(20),
+            namaAngkut VARCHAR(100),
+            nomorVoyFlight VARCHAR(50),
+            callSign VARCHAR(50),
+            tanggalTiba VARCHAR(50),
+            refNumberPlp VARCHAR(50),
+            jenisTransaksi VARCHAR(50),
+            userKirim VARCHAR(50),
+            raw_data JSON,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_plp_nomor (nomorPlp),
+            INDEX idx_plp_idTps (idTpsPlp)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ",
+
+    // 18a. PLP On-Demand Kontainer
+    'ceisa_plp_kontainer' => "
+        CREATE TABLE IF NOT EXISTS ceisa_plp_kontainer (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            idTpsPlp VARCHAR(50),
+            nomorKontainer VARCHAR(50),
+            ukuranKontainer VARCHAR(20),
+            jenisMuat VARCHAR(20),
+            nomorPosBc11 VARCHAR(50),
+            nomorHostBl VARCHAR(100),
+            tanggalHostBl VARCHAR(50),
+            namaPemilik VARCHAR(100),
+            flagSetuju VARCHAR(20),
+            INDEX idx_plp_kont_idTps (idTpsPlp),
+            INDEX idx_plp_kont_no (nomorKontainer)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ",
+
+    // 18b. PLP On-Demand Kemasan
+    'ceisa_plp_kemasan' => "
+        CREATE TABLE IF NOT EXISTS ceisa_plp_kemasan (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            idTpsPlp VARCHAR(50),
+            jenisKemasan VARCHAR(20),
+            jumlahKemasan DECIMAL(15,2),
+            nomorPosBc11 VARCHAR(50),
+            nomorBlAwb VARCHAR(100),
+            tanggalBlAwb VARCHAR(50),
+            consignee VARCHAR(255),
+            flagSetuju VARCHAR(20),
+            INDEX idx_plp_kem_idTps (idTpsPlp),
+            INDEX idx_plp_kem_bl (nomorBlAwb)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "
 ];
 

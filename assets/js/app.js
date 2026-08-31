@@ -623,10 +623,20 @@
         const container = document.getElementById('results-container');
         container.innerHTML = `
             <div class="results-card" style="padding: 0;">
-                <div class="empty-state">
-                    <div class="empty-icon">📭</div>
-                    <h4>Tidak Ada Data</h4>
-                    <p>${message || 'Silakan ubah parameter pencarian dan coba lagi'}</p>
+                <div class="results-header" style="border-bottom: 1px solid var(--border-color); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div class="results-info">
+                        <h4 style="margin: 0;">Hasil Data</h4>
+                    </div>
+                    <div class="results-actions">
+                        <button class="btn btn-sm btn-json" style="padding: 6px 12px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;" onclick="window.CeisaApp.showJSON()">
+                            <span style="font-family: monospace; font-weight: bold;">{ }</span> Raw JSON
+                        </button>
+                    </div>
+                </div>
+                <div class="empty-state" style="padding: 40px 20px; text-align: center;">
+                    <div class="empty-icon" style="font-size: 3rem; margin-bottom: 15px;">📭</div>
+                    <h4 style="margin: 0 0 10px 0; color: var(--text-primary);">Tidak Ada Data</h4>
+                    <p style="margin: 0; color: var(--text-secondary);">${message || 'Silakan ubah parameter pencarian dan coba lagi'}</p>
                 </div>
             </div>
         `;

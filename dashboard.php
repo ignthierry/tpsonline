@@ -41,56 +41,7 @@ $userInitial = strtoupper(substr($username, 0, 2));
         <div class="sidebar-overlay"></div>
 
         <!-- ===== SIDEBAR ===== -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-brand">
-                    <div class="brand-icon">🏛️</div>
-                    <div class="brand-text">
-                        <h2>CEISA 4.0</h2>
-                        <span>TPS Online H2H</span>
-                    </div>
-                </div>
-            </div>
-
-            <nav class="sidebar-nav">
-                <!-- Home -->
-                <div class="nav-section">
-                    <div class="nav-item active" data-page="home">
-                        <span class="nav-icon">🏠</span>
-                        <span>Dashboard</span>
-                    </div>
-                </div>
-
-                <!-- CCTV Monitoring -->
-                <div class="nav-section">
-                    <a href="cctv.php" class="nav-item" style="text-decoration:none; color:inherit;">
-                        <span class="nav-icon">📹</span>
-                        <span>CCTV Live Stream</span>
-                        <span class="nav-badge" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">LIVE</span>
-                    </a>
-                </div>
-
-                <!-- Dynamic Categories -->
-                <?php foreach ($endpoints as $catKey => $category): ?>
-                <div class="nav-section">
-                    <div class="nav-section-label"><?= e($category['label']) ?></div>
-                    <div class="nav-item" data-category="<?= e($catKey) ?>">
-                        <span class="nav-icon"><?= $category['icon'] ?></span>
-                        <span><?= e($category['label']) ?></span>
-                        <span class="nav-badge"><?= count($category['endpoints']) ?></span>
-                        <span class="chevron">›</span>
-                    </div>
-                    <div class="nav-subitems">
-                        <?php foreach ($category['endpoints'] as $epKey => $ep): ?>
-                        <div class="nav-subitem" data-endpoint="<?= e($epKey) ?>">
-                            <?= e($ep['label']) ?>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </nav>
-        </aside>
+        <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
         <!-- ===== MAIN CONTENT ===== -->
         <div class="main-content">

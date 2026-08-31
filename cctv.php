@@ -394,49 +394,7 @@ $defaultWsBridge = 'ws://' . ($_SERVER['SERVER_NAME'] ?? 'localhost') . ':9999';
         <div class="sidebar-overlay"></div>
 
         <!-- ===== SIDEBAR ===== -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-brand">
-                    <div class="brand-icon">🏛️</div>
-                    <div class="brand-text">
-                        <h2>CEISA 4.0</h2>
-                        <span>TPS Online H2H</span>
-                    </div>
-                </div>
-            </div>
-
-            <nav class="sidebar-nav">
-                <!-- Home -->
-                <div class="nav-section">
-                    <a href="dashboard.php" class="nav-item" style="text-decoration:none; color:inherit;">
-                        <span class="nav-icon">🏠</span>
-                        <span>Dashboard</span>
-                    </a>
-                </div>
-
-                <!-- CCTV Menu (Active) -->
-                <div class="nav-section">
-                    <div class="nav-section-label">Monitoring & Security</div>
-                    <div class="nav-item active" style="cursor:default;">
-                        <span class="nav-icon">📹</span>
-                        <span>CCTV Live Stream</span>
-                        <span class="nav-badge" style="background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">LIVE</span>
-                    </div>
-                </div>
-
-                <!-- CEISA Dynamic Categories Links to Dashboard -->
-                <div class="nav-section-label">Layanan Bea Cukai</div>
-                <?php foreach ($endpoints as $catKey => $category): ?>
-                <div class="nav-section">
-                    <a href="dashboard.php" class="nav-item" style="text-decoration:none; color:inherit;">
-                        <span class="nav-icon"><?= $category['icon'] ?></span>
-                        <span><?= e($category['label']) ?></span>
-                        <span class="nav-badge"><?= count($category['endpoints']) ?></span>
-                    </a>
-                </div>
-                <?php endforeach; ?>
-            </nav>
-        </aside>
+        <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
         <!-- ===== MAIN CONTENT ===== -->
         <div class="main-content">
@@ -528,10 +486,7 @@ $defaultWsBridge = 'ws://' . ($_SERVER['SERVER_NAME'] ?? 'localhost') . ':9999';
                                     <span>📸</span>
                                     <span>Snapshot</span>
                                 </button>
-                                <button class="cctv-btn" id="btn-motion" title="Aktifkan AI Motion Detection">
-                                    <span>🏃</span>
-                                    <span id="btn-motion-text">Motion: ON</span>
-                                </button>
+
                                 <button class="cctv-btn" id="btn-settings" title="Pengaturan RTSP & Bridge">
                                     <span>⚙️</span>
                                     <span>Settings</span>
@@ -596,16 +551,7 @@ ffmpeg -i "rtsp://admin:Admin123@192.168.1.101:554/Streaming/Channels/101" -f mp
                         </div>
                     </div>
 
-                    <!-- Motion Log Gallery -->
-                    <div class="cctv-info-card" style="margin-top: 20px; grid-column: 1 / -1;">
-                        <h3 style="color: #ef4444;"><span>🚨</span> Log Aktivitas Pergerakan (Auto Snapshot)</h3>
-                        <p style="font-size:0.83rem; color:var(--text-secondary); margin:0 0 15px 0;">
-                            Sistem akan otomatis mengambil tangkapan layar setiap kali mendeteksi ada pergerakan di area CCTV.
-                        </p>
-                        <div id="motion-log-gallery" style="display: flex; gap: 15px; overflow-x: auto; padding: 10px 0; min-height: 160px; align-items: center;">
-                            <p style="color:var(--text-secondary); font-size: 0.9rem; margin: auto;" id="motion-log-empty">Belum ada pergerakan yang terdeteksi. Pastikan tombol Motion ON.</p>
-                        </div>
-                    </div>
+
 
                 </div>
             </main>
@@ -674,9 +620,7 @@ ffmpeg -i "rtsp://admin:Admin123@192.168.1.101:554/Streaming/Channels/101" -f mp
         // State
         const state = {
             isPlaying: true,
-            motionEnabled: true,
-            motionDetected: false,
-            lastMotionSnapshotTime: 0,
+
             channel: '101',
             rtspUrl: localStorage.getItem('cctv_rtsp_url') || '<?= $defaultRtspUrl ?>',
             wsUrl: localStorage.getItem('cctv_ws_url') || '<?= $defaultWsBridge ?>',
@@ -693,12 +637,7 @@ ffmpeg -i "rtsp://admin:Admin123@192.168.1.101:554/Streaming/Channels/101" -f mp
         const ctx = canvas.getContext('2d');
         const stage = document.getElementById('cctv-stage');
 
-        // Motion Detection Offscreen Canvas
-        const motionCanvas = document.createElement('canvas');
-        motionCanvas.width = 64; // Downscale to 64x36 for fast diffing
-        motionCanvas.height = 36;
-        const motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
-        let previousImageData = null;
+
 
         // Theme Toggle Handler
         const themeToggleBtn = document.getElementById('theme-toggle');
@@ -799,91 +738,6 @@ ffmpeg -i "rtsp://admin:Admin123@192.168.1.101:554/Streaming/Channels/101" -f mp
         // Live Canvas Rendering Loop (HTTP Snapshot Polling)
         let isFetchingFrame = false;
 
-        function checkMotion(img) {
-            if (!state.motionEnabled) return;
-            
-            try {
-                motionCtx.drawImage(img, 0, 0, motionCanvas.width, motionCanvas.height);
-                const currentImageData = motionCtx.getImageData(0, 0, motionCanvas.width, motionCanvas.height);
-                
-                if (previousImageData) {
-                    let diffCount = 0;
-                    const data1 = currentImageData.data;
-                    const data2 = previousImageData.data;
-                    const len = data1.length;
-                    
-                    let minX = motionCanvas.width, minY = motionCanvas.height, maxX = 0, maxY = 0;
-                    
-                    for (let i = 0; i < len; i += 4) {
-                        const diffR = Math.abs(data1[i] - data2[i]);
-                        const diffG = Math.abs(data1[i+1] - data2[i+1]);
-                        const diffB = Math.abs(data1[i+2] - data2[i+2]);
-                        
-                        // threshold
-                        if (diffR + diffG + diffB > 120) {
-                            diffCount++;
-                            let p = i / 4;
-                            let x = p % motionCanvas.width;
-                            let y = Math.floor(p / motionCanvas.width);
-                            if (x < minX) minX = x;
-                            if (x > maxX) maxX = x;
-                            if (y < minY) minY = y;
-                            if (y > maxY) maxY = y;
-                        }
-                    }
-                    
-                    const totalPixels = motionCanvas.width * motionCanvas.height;
-                    if ((diffCount / totalPixels) > 0.015) {
-                        state.motionDetected = true;
-                        
-                        // Add some padding to bounding box
-                        minX = Math.max(0, minX - 2);
-                        minY = Math.max(0, minY - 2);
-                        maxX = Math.min(motionCanvas.width, maxX + 2);
-                        maxY = Math.min(motionCanvas.height, maxY + 2);
-                        
-                        state.motionBox = {
-                            x: (minX / motionCanvas.width) * canvas.width,
-                            y: (minY / motionCanvas.height) * canvas.height,
-                            w: ((maxX - minX) / motionCanvas.width) * canvas.width,
-                            h: ((maxY - minY) / motionCanvas.height) * canvas.height
-                        };
-                    } else {
-                        state.motionDetected = false;
-                    }
-                }
-                previousImageData = currentImageData;
-            } catch (err) {
-                console.warn('Motion detection error:', err);
-            }
-        }
-
-        function drawMotionAlert() {
-            if (state.motionEnabled && state.motionDetected && state.motionBox) {
-                ctx.save();
-                
-                // Draw tracking bounding box
-                ctx.strokeStyle = '#22c55e'; // Green tracking box
-                ctx.lineWidth = 3;
-                ctx.setLineDash([5, 5]);
-                ctx.strokeRect(state.motionBox.x, state.motionBox.y, state.motionBox.w, state.motionBox.h);
-                
-                // Draw small label on top of bounding box
-                ctx.fillStyle = '#22c55e';
-                ctx.font = 'bold 12px "JetBrains Mono", monospace';
-                ctx.fillText('DETECTED', state.motionBox.x, state.motionBox.y - 5);
-                
-                // Global Alert text
-                ctx.fillStyle = '#ef4444';
-                ctx.font = 'bold 24px "JetBrains Mono", monospace';
-                ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                ctx.shadowBlur = 4;
-                ctx.setLineDash([]);
-                ctx.fillText('⚠️ MOTION DETECTED', canvas.width / 2 - 120, 40);
-                
-                ctx.restore();
-            }
-        }
 
         function fetchNextFrame() {
             if (!state.isPlaying) return Promise.resolve();
@@ -911,17 +765,7 @@ ffmpeg -i "rtsp://admin:Admin123@192.168.1.101:554/Streaming/Channels/101" -f mp
                     }
                     if (state.isPlaying) {
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        checkMotion(img);
-                        drawMotionAlert();
-                        
-                        // Automatic Motion Snapshot Capture
-                        if (state.motionEnabled && state.motionDetected) {
-                            const now = Date.now();
-                            if (now - state.lastMotionSnapshotTime > 3000) { // Max 1 snapshot per 3 seconds
-                                state.lastMotionSnapshotTime = now;
-                                addMotionSnapshot(canvas.toDataURL('image/jpeg', 0.6));
-                            }
-                        }
+
                     }
                     isFetchingFrame = false;
                     resolve();
@@ -934,59 +778,7 @@ ffmpeg -i "rtsp://admin:Admin123@192.168.1.101:554/Streaming/Channels/101" -f mp
             });
         }
 
-        function addMotionSnapshot(dataUrl) {
-            const gallery = document.getElementById('motion-log-gallery');
-            const emptyText = document.getElementById('motion-log-empty');
-            if (emptyText) emptyText.style.display = 'none';
-            
-            const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'min-width: 220px; max-width: 220px; border-radius: 8px; overflow: hidden; background: var(--bg-card); border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.3);';
-            
-            const timeStr = new Date().toISOString().replace('T', ' ').substring(11, 19);
-            
-            wrapper.innerHTML = `
-                <img src="${dataUrl}" style="width: 100%; height: 124px; object-fit: cover; display: block;" alt="Motion Snapshot">
-                <div style="padding: 10px; text-align: center; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; color: #ef4444; font-weight: bold; background: rgba(0,0,0,0.3);">
-                    ⚠️ ${timeStr} <span class="sync-status" style="font-size:0.7rem; color:#94a3b8; display:block;">Saving...</span>
-                </div>
-            `;
-            
-            gallery.prepend(wrapper);
-            
-            // Keep only the last 20 snapshots in UI
-            while (gallery.children.length > 20) {
-                gallery.removeChild(gallery.lastChild);
-            }
 
-            // Save to Server
-            fetch('api/save_snapshot.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    image: dataUrl,
-                    channel: state.channel
-                })
-            }).then(r => r.json()).then(res => {
-                const statusSpan = wrapper.querySelector('.sync-status');
-                if (res.status === 'success') {
-                    if (statusSpan) {
-                        statusSpan.textContent = 'Saved to disk';
-                        statusSpan.style.color = '#22c55e';
-                    }
-                } else {
-                    if (statusSpan) {
-                        statusSpan.textContent = 'Save failed';
-                        statusSpan.style.color = '#ef4444';
-                    }
-                }
-            }).catch(e => {
-                const statusSpan = wrapper.querySelector('.sync-status');
-                if (statusSpan) {
-                    statusSpan.textContent = 'Network error';
-                    statusSpan.style.color = '#ef4444';
-                }
-            });
-        }
 
         function renderCanvasFrame() {
             if (!state.isPlaying) {
@@ -1007,32 +799,14 @@ ffmpeg -i "rtsp://admin:Admin123@192.168.1.101:554/Streaming/Channels/101" -f mp
             }
 
             fetchNextFrame().then(() => {
-                // Determine refresh rate (approx 10-15 FPS is good for MJPEG polling without killing the server)
-                state.animFrameId = setTimeout(renderCanvasFrame, 80); // ~12 FPS
+                // Kurangi delay untuk frame rate yang lebih tinggi
+                state.animFrameId = setTimeout(renderCanvasFrame, 30); // ~30 FPS
             });
         }
 
         function startHttpPollingLoop() { if (state.animFrameId) clearTimeout(state.animFrameId); state.animFrameId = setTimeout(renderCanvasFrame, 10); }
 
-        // Motion Detection Button
-        const btnMotion = document.getElementById('btn-motion');
-        if (btnMotion) {
-            btnMotion.addEventListener('click', () => {
-                state.motionEnabled = !state.motionEnabled;
-                const text = document.getElementById('btn-motion-text');
-                if (state.motionEnabled) {
-                    btnMotion.className = 'cctv-btn cctv-btn-success';
-                    if (text) text.textContent = 'Motion: ON';
-                    showToast('AI Motion Detection diaktifkan', 'success');
-                } else {
-                    btnMotion.className = 'cctv-btn';
-                    if (text) text.textContent = 'Motion: ON';
-                    state.motionDetected = false;
-                    previousImageData = null; // Reset baseline
-                    showToast('AI Motion Detection dimatikan', 'info');
-                }
-            });
-        }
+
         // Play / Pause Stream
         const btnPlayPause = document.getElementById('btn-play-pause');
         if (btnPlayPause) {
