@@ -215,7 +215,14 @@
         const breadcrumb = document.getElementById('header-breadcrumb');
         if (breadcrumb) breadcrumb.innerHTML = '<span class="current">Dashboard</span>';
 
-        let quickCardsHtml = '';
+        let quickCardsHtml = `
+            <div class="quick-card" onclick="window.location.href='cococont.php'" style="border:1px solid rgba(59, 130, 246, 0.4); background:rgba(59, 130, 246, 0.04); cursor:pointer;">
+                <div class="qc-icon">📦</div>
+                <h4>Coarri Codeco (CoCoCont)</h4>
+                <p>Upload Container In & Out ke REST API CEISA 4.0</p>
+                <div class="qc-count" style="color:#3b82f6;">⚡ CEISA 4.0 (In / Out)</div>
+            </div>
+        `;
         for (const [catKey, cat] of Object.entries(ENDPOINTS)) {
             const epCount = Object.keys(cat.endpoints).length;
             quickCardsHtml += `

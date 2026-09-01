@@ -6,9 +6,9 @@
 
 require_once __DIR__ . '/../config.php';
 
-$host = env('DB_HOST', '100.90.187.128');
-$user = env('DB_USER', 'luna');
-$pass = env('DB_PASS', 'N2145tb@');
+$host = env('DB_HOST', '192.168.0.192');
+$user = env('DB_USER', 'itpsu');
+$pass = env('DB_PASS', '123123');
 $dbTpsonline = env('DB_NAME_TPSONLINE', 'tpsonline');
 $dbTpp = env('DB_NAME_TPP', 'tpp_primamas');
 $dbPrimamas = env('DB_NAME_PRIMAMAS', 'primamas');

@@ -1508,3 +1508,139 @@ body {
         display: none;
     }
 }
+
+/* ==========================================================================
+   DATATABLES ENTERPRISE THEME INTEGRATION
+   ========================================================================== */
+.dataTables_wrapper {
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    padding-top: 6px;
+    width: 100%;
+}
+.dataTables_wrapper .dt-top-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.dataTables_wrapper .dt-bottom-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-subtle);
+}
+.dataTables_wrapper .dataTables_length {
+    color: var(--text-secondary);
+}
+.dataTables_wrapper .dataTables_length select {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border-medium);
+    border-radius: 6px;
+    padding: 6px 10px;
+    outline: none;
+    margin: 0 4px;
+    cursor: pointer;
+}
+.dataTables_wrapper .dataTables_filter {
+    color: var(--text-secondary);
+}
+.dataTables_wrapper .dataTables_filter input {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border-medium);
+    border-radius: 8px;
+    padding: 7px 14px;
+    outline: none;
+    margin-left: 8px;
+    min-width: 240px;
+    font-size: 0.88rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+.dataTables_wrapper .dataTables_info {
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    padding-top: 6px;
+}
+.dataTables_wrapper .dataTables_paginate {
+    padding-top: 4px;
+    display: flex;
+    gap: 4px;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    background: var(--bg-surface) !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 6px !important;
+    padding: 5px 11px !important;
+    font-weight: 500;
+    font-size: 0.85rem;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: rgba(59, 130, 246, 0.15) !important;
+    color: var(--accent-blue) !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: var(--accent-blue) !important;
+    color: #ffffff !important;
+    border-color: var(--accent-blue) !important;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.35);
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    background: transparent !important;
+    border-color: var(--border-subtle) !important;
+}
+table.dataTable {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    margin: 0 !important;
+}
+table.dataTable thead th {
+    background: var(--bg-table-th) !important;
+    color: var(--text-secondary) !important;
+    border-bottom: 1px solid var(--border-medium) !important;
+    padding: 11px 14px !important;
+    font-weight: 600 !important;
+    font-size: 0.82rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+}
+table.dataTable thead th:hover {
+    color: var(--text-primary) !important;
+    background: var(--bg-table-th-hover) !important;
+}
+table.dataTable tbody td {
+    padding: 10px 14px !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+table.dataTable tbody tr {
+    background: transparent !important;
+    transition: background-color 0.15s;
+}
+table.dataTable tbody tr:hover {
+    background-color: var(--bg-table-hover) !important;
+}
+table.dataTable.no-footer {
+    border-bottom: 1px solid var(--border-subtle) !important;
+}

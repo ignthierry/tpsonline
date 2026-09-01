@@ -195,7 +195,9 @@ class CeisaClient
             }
         }
 
-        $url = $this->baseUrl . '/' . ltrim($endpoint, '/');
+        $url = (strpos($endpoint, 'http://') === 0 || strpos($endpoint, 'https://') === 0) 
+            ? $endpoint 
+            : ($this->baseUrl . '/' . ltrim($endpoint, '/'));
         if (!empty($params)) {
             $url .= '?' . http_build_query($params);
         }
@@ -315,7 +317,9 @@ class CeisaClient
             }
         }
 
-        $url = $this->baseUrl . '/' . ltrim($endpoint, '/');
+        $url = (strpos($endpoint, 'http://') === 0 || strpos($endpoint, 'https://') === 0) 
+            ? $endpoint 
+            : ($this->baseUrl . '/' . ltrim($endpoint, '/'));
 
         $headers = [
             'Content-Type: application/json',

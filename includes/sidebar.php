@@ -3,6 +3,11 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 $isDashboard = ($currentPage === 'dashboard.php' || $currentPage === 'index.php');
 $isCCTV = ($currentPage === 'cctv.php');
 $isPostData = ($currentPage === 'post_dokumen.php');
+$isCoCoCont = ($currentPage === 'cococont.php');
+$isReport = ($currentPage === 'report.php');
+if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
+    $endpoints = getEndpointDefinitions();
+}
 ?>
 <aside class="sidebar">
     <div class="sidebar-header">
@@ -45,6 +50,25 @@ $isPostData = ($currentPage === 'post_dokumen.php');
             <a href="post_dokumen.php" class="nav-item <?= $isPostData ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isPostData ? 'cursor:default;' : '' ?>">
                 <span class="nav-icon">📤</span>
                 <span>Kirim Dokumen (POST)</span>
+            </a>
+        </div>
+
+        <!-- Coarri Codeco (CoCoCont) CEISA 4.0 -->
+        <div class="nav-section">
+            <a href="cococont.php" class="nav-item <?= $isCoCoCont ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isCoCoCont ? 'cursor:default;' : '' ?>">
+                <span class="nav-icon">📦</span>
+                <span>Coarri Codeco (CoCoCont)</span>
+                <span class="nav-badge" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">CEISA 4.0</span>
+            </a>
+        </div>
+
+        <!-- Section Laporan -->
+        <div class="nav-section-label" style="margin-top: 15px; padding: 0 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); font-weight: 600;">Laporan</div>
+        <div class="nav-section">
+            <a href="report.php" class="nav-item <?= $isReport ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReport ? 'cursor:default;' : '' ?>">
+                <span class="nav-icon">📊</span>
+                <span>Laporan Coarri Codeco</span>
+                <span class="nav-badge" style="background:rgba(16, 185, 129, 0.2); color:#10b981; border:1px solid rgba(16,185,129,0.3);">CoCoCont</span>
             </a>
         </div>
 
