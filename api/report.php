@@ -33,6 +33,8 @@ if ($action === 'cek_terkirim') {
     $tglAwal = normalizeDateDmy($tglAwalRaw);
     $tglAkhir = normalizeDateDmy($tglAkhirRaw);
 
+    $category = strtolower(trim($_REQUEST['category'] ?? $_GET['category'] ?? $_POST['category'] ?? $_REQUEST['service'] ?? $_GET['service'] ?? $_POST['service'] ?? ''));
+
     try {
         $client = new CeisaClient();
         $apiRes = $client->get('cek-data-terkirim', [
@@ -50,6 +52,13 @@ if ($action === 'cek_terkirim') {
 
         if (is_array($responData)) {
             foreach ($responData as $serviceKey => $serviceVal) {
+                // Filter berdasarkan kategori jika ditentukan
+                if ($category === 'container' || $category === 'coarri-codeco-container' || $category === 'cococont') {
+                    if ($serviceKey !== 'coarri-codeco-container') continue;
+                } elseif ($category === 'kemasan' || $category === 'coarri-codeco-kemasan' || $category === 'cocokms') {
+                    if ($serviceKey !== 'coarri-codeco-kemasan') continue;
+                }
+
                 $serviceList[] = $serviceKey;
                 $jumlah = $serviceVal['jumlah'] ?? 0;
                 $totalJumlah += $jumlah;

@@ -1,7 +1,7 @@
 <?php
 /**
- * Laporan Data Terkirim CEISA 4.0
- * Endpoint: /cek-data-terkirim
+ * Laporan Data Terkirim Kemasan (CoCoKms) CEISA 4.0
+ * Endpoint: /cek-data-terkirim (Filtered: coarri-codeco-kemasan)
  * Terintegrasi dengan jQuery DataTables, Auto-Sync AJAX, dan Desain Modern Enterprise
  */
 
@@ -19,7 +19,7 @@ $todayDate = date('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan Coarri Codeco (CoCoCont) CEISA 4.0 — <?= e($config['app_name']) ?></title>
+    <title>Laporan Coarri Codeco Kemasan (CoCoKms) CEISA 4.0 — <?= e($config['app_name']) ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -240,7 +240,7 @@ $todayDate = date('Y-m-d');
                         <span class="separator">/</span>
                         <span>Laporan</span>
                         <span class="separator">/</span>
-                        <span class="current">Coarri Codeco (CoCoCont)</span>
+                        <span class="current">Coarri Codeco (Kemasan)</span>
                     </div>
                 </div>
                 <div class="header-right">
@@ -269,20 +269,20 @@ $todayDate = date('Y-m-d');
                         <div style="margin-bottom: 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                             <div>
                                 <h2 style="margin:0; font-size:1.25rem; color:var(--text-primary); font-weight:700;">
-                                    📊 Laporan Coarri Codeco Container (CoCoCont)
+                                    📊 Laporan Coarri Codeco Kemasan (CoCoKms)
                                 </h2>
                                 <p style="margin:4px 0 0; color:var(--text-secondary); font-size:0.88rem;">
-                                    Monitoring & verifikasi data pergerakan kontainer (Gate-In / Gate-Out) yang telah resmi tersimpan di server Bea Cukai CEISA 4.0.
+                                    Monitoring & verifikasi data pengiriman kemasan LCL (Gate-In Stripping / Gate-Out Pengeluaran) yang telah tersimpan di server CEISA 4.0.
                                 </p>
                             </div>
                             <div style="display:flex; gap:10px; align-items:center;">
-                                <a href="cococont.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-                                    <span>📦</span> Menu CoCoCont
+                                <a href="cocokms.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                                    <span>📦</span> Menu CoCoKms
                                 </a>
-                                <a href="report_kms.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; color:#c4b5fd; border-color:rgba(139,92,246,0.3); background:rgba(139,92,246,0.1);">
-                                    <span>📊</span> Laporan Kemasan
+                                <a href="report.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; color:#93c5fd; border-color:rgba(59,130,246,0.3); background:rgba(59,130,246,0.1);">
+                                    <span>📊</span> Laporan Container
                                 </a>
-                                <span class="badge-pill badge-ceisa">coarri-codeco-container</span>
+                                <span class="badge-pill badge-ceisa">coarri-codeco-kemasan</span>
                             </div>
                         </div>
 
@@ -315,7 +315,7 @@ $todayDate = date('Y-m-d');
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Layanan / Service</span>
-                            <span class="stat-value" id="stat-service" style="font-size:1.15rem; color:var(--accent-purple);">coarri-codeco-container</span>
+                            <span class="stat-value" id="stat-service" style="font-size:1.15rem; color:var(--accent-purple);">coarri-codeco-kemasan</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Rentang Tanggal</span>
@@ -334,7 +334,7 @@ $todayDate = date('Y-m-d');
                         <!-- Tabs -->
                         <div class="tabs-nav">
                             <button class="tab-btn active" onclick="switchTab('tab-table', this)">
-                                <span>📋</span> Data Terkirim CoCoCont (<span id="tab-count">0</span>)
+                                <span>📋</span> Data Terkirim Kemasan (<span id="tab-count">0</span>)
                             </button>
                             <button class="tab-btn" onclick="switchTab('tab-json', this)">
                                 <span>📦</span> Respon JSON CEISA 4.0
@@ -345,7 +345,7 @@ $todayDate = date('Y-m-d');
                         <div class="tab-content active" id="tab-table">
                             <div style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                                 <div style="font-size:0.88rem; color:var(--text-secondary);">
-                                    <span>Tabel Interaktif Pengiriman Coarri Codeco Container (Sorting, Filter & Pagination DataTables aktif)</span>
+                                    <span>Tabel Interaktif Pengiriman Kemasan LCL (Sorting, Filter & Pagination DataTables aktif)</span>
                                 </div>
                                 <button type="button" class="btn-action-sm" style="color:#c4b5fd; border-color:rgba(139,92,246,0.4); background:rgba(139,92,246,0.12);" onclick="switchTab('tab-json', document.querySelectorAll('.tab-btn')[1])">
                                     <span>⚡</span> Lihat Raw JSON
@@ -467,7 +467,7 @@ $todayDate = date('Y-m-d');
                 type: 'GET',
                 data: {
                     action: 'cek_terkirim',
-                    category: 'container',
+                    category: 'kemasan',
                     tanggalAwal: tglAwal,
                     tanggalAkhir: tglAkhir
                 },
@@ -486,7 +486,7 @@ $todayDate = date('Y-m-d');
                         $('#result-card').hide();
 
                         if (showNotification) {
-                            showToast(result.message || 'Tidak ada data terkirim pada rentang tanggal tersebut', 'info');
+                            showToast(result.message || 'Tidak ada data pengiriman kemasan pada rentang tanggal tersebut', 'info');
                         }
                         return;
                     }
@@ -502,7 +502,7 @@ $todayDate = date('Y-m-d');
                         $('#result-card').hide();
 
                         if (showNotification) {
-                            showToast(`Tidak ada referensi terkirim pada ${result.tglAwal} s/d ${result.tglAkhir}`, 'info');
+                            showToast(`Tidak ada referensi kemasan terkirim pada ${result.tglAwal} s/d ${result.tglAkhir}`, 'info');
                         }
                         return;
                     }
@@ -513,7 +513,7 @@ $todayDate = date('Y-m-d');
 
                     $('#stat-count').text(result.count + ' Ref Batch');
                     $('#tab-count').text(result.count);
-                    $('#stat-service').text(result.services.join(', ') || 'coarri-codeco-container');
+                    $('#stat-service').text(result.services.join(', ') || 'coarri-codeco-kemasan');
                     $('#stat-range').text(`${result.tglAwal} s/d ${result.tglAkhir}`);
 
                     // Render DataTables
@@ -522,24 +522,23 @@ $todayDate = date('Y-m-d');
                     // Render JSON Box
                     $('#json-viewer').val(JSON.stringify(rawApiResponse, null, 4));
 
-                    $('#auto-sync-status').html('<span class="pulse-dot"></span> <span style="color:#10b981;">Terkonfirmasi (' + result.count + ' Ref Terkirim)</span>');
-
+                    $('#auto-sync-status').html('<span class="pulse-dot"></span> <span style="color:#10b981;">Tersinkron (' + result.count + ' Ref Kemasan)</span>');
                     if (showNotification) {
-                        showToast(`Ditemukan ${result.count} referensi pengiriman resmi di CEISA 4.0!`, 'success');
+                        showToast(`Ditemukan ${result.count} data pengiriman kemasan terverifikasi CEISA 4.0!`, 'success');
                     }
                 },
                 error: function(xhr, status, error) {
                     if (status === 'abort') return;
                     console.error('AJAX Error:', error);
-                    showToast('Gagal terhubung ke API Gateway: ' + error, 'error');
-                    $('#auto-sync-status').html('❌ <span style="color:#ef4444;">Error koneksi API</span>');
+                    showToast('Gagal terhubung ke API Report: ' + error, 'error');
+                    $('#auto-sync-status').html('❌ <span style="color:#ef4444;">Koneksi gagal</span>');
                 }
             });
         }
 
         function renderReportTable(rows) {
-            if ($.fn.DataTable.isDataTable('#table-report')) {
-                $('#table-report').DataTable().destroy();
+            if (dataTableInstance) {
+                dataTableInstance.destroy();
                 dataTableInstance = null;
             }
 
@@ -552,17 +551,28 @@ $todayDate = date('Y-m-d');
                     <td style="text-align:center;">${idx + 1}</td>
                     <td>
                         <span class="ref-badge">
-                            <span>📄</span>
                             <span>${r.referenceNumber}</span>
-                            <button type="button" class="btn-copy-ref" onclick="copyText('${r.referenceNumber}')" title="Salin Reference Number">📋</button>
+                            <button type="button" class="btn-copy-ref" onclick="copyText('${r.referenceNumber}')" title="Salin Ref Number">📋</button>
                         </span>
                     </td>
-                    <td><span class="badge-pill" style="background:rgba(139,92,246,0.12); color:#c4b5fd; border:1px solid rgba(139,92,246,0.3);">${r.serviceLabel || r.service}</span></td>
-                    <td><span style="font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${r.tglAwal} s/d ${r.tglAkhir}</span></td>
-                    <td><span class="badge-pill badge-in">✅ ${r.status}</span></td>
+                    <td>
+                        <span class="badge-pill" style="background:rgba(139, 92, 246, 0.15); color:#a78bfa; border:1px solid rgba(139, 92, 246, 0.3); font-weight:600;">
+                            ${r.serviceLabel}
+                        </span>
+                    </td>
+                    <td>
+                        <span style="font-family:'JetBrains Mono',monospace; font-size:0.85rem; color:var(--text-secondary);">
+                            ${r.tglAwal} s/d ${r.tglAkhir}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge-pill badge-in">
+                            <span>✅ ${r.status}</span>
+                        </span>
+                    </td>
                     <td style="text-align:center;">
-                        <button type="button" class="btn-action-sm" onclick="copyText('${r.referenceNumber}')" title="Salin">
-                            <span>📋</span> Salin
+                        <button type="button" class="btn-action-sm" onclick="copyText('${r.referenceNumber}')" style="padding:4px 10px; font-size:0.8rem;">
+                            <span>Salin Ref</span>
                         </button>
                     </td>
                 `;
@@ -574,13 +584,13 @@ $todayDate = date('Y-m-d');
                 pageLength: 10,
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Semua"]],
                 language: {
-                    search: "Cari:",
-                    searchPlaceholder: "Nomor referensi / dokumen...",
+                    search: "Cari Data:",
+                    searchPlaceholder: "Nomor Referensi...",
                     lengthMenu: "Tampilkan _MENU_ data",
-                    info: "Menampilkan _START_ s/d _END_ dari _TOTAL_ data referensi",
+                    info: "Menampilkan _START_ s/d _END_ dari _TOTAL_ pengiriman",
                     infoEmpty: "Tidak ada data pengiriman",
-                    infoFiltered: "(difilter dari _MAX_ total data)",
-                    zeroRecords: "Tidak ada data yang cocok dengan pencarian",
+                    infoFiltered: "(difilter dari _MAX_ total pengiriman)",
+                    zeroRecords: "Tidak ada nomor referensi yang sesuai",
                     paginate: {
                         first: "«",
                         previous: "‹",
@@ -594,8 +604,9 @@ $todayDate = date('Y-m-d');
         }
 
         function copyText(txt) {
+            if (!txt) return;
             navigator.clipboard.writeText(txt).then(() => {
-                showToast(`Reference number ${txt} disalin ke clipboard!`, 'success');
+                showToast(`Nomor referensi ${txt} disalin ke clipboard!`, 'success');
             }).catch(e => {
                 showToast('Gagal menyalin: ' + e, 'error');
             });
@@ -607,7 +618,7 @@ $todayDate = date('Y-m-d');
             navigator.clipboard.writeText(viewer.value).then(() => {
                 showToast('Respon JSON berhasil disalin!', 'success');
             }).catch(e => {
-                showToast('Gagal menyalin: ' + e, 'error');
+                showToast('Gagal menyalin JSON: ' + e, 'error');
             });
         }
 
@@ -618,10 +629,10 @@ $todayDate = date('Y-m-d');
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `CEISA4_Laporan_CoCoCont_${tgl}.json`;
+            a.download = `CEISA4_Report_Kemasan_${tgl}.json`;
             a.click();
             URL.revokeObjectURL(url);
-            showToast('JSON berhasil diunduh!', 'success');
+            showToast('File JSON berhasil diunduh!', 'success');
         }
 
         async function refreshAccessToken() {
@@ -635,7 +646,6 @@ $todayDate = date('Y-m-d');
                 const data = await res.json();
                 if (data.success) {
                     showToast('Token JWT berhasil diperbarui!', 'success');
-                    loadReportData(true);
                 } else {
                     showToast(data.message || 'Gagal memperbarui token', 'error');
                 }
@@ -665,14 +675,13 @@ $todayDate = date('Y-m-d');
             this.classList.remove('active');
         });
 
-        // jQuery Auto-Sync Listeners
+        // Auto-sync AJAX saat tanggal berubah & load awal
         $(document).ready(function() {
-            // Otomatis proses saat berpindah tanggal awal atau akhir
             $('#tgl-awal, #tgl-akhir').on('change', function() {
                 loadReportData(true);
             });
 
-            // Otomatis proses saat halaman pertama kali dibuka
+            // Load data otomatis saat pertama kali dibuka
             loadReportData(false);
         });
     </script>

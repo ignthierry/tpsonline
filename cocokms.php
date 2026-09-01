@@ -1,20 +1,19 @@
 <?php
 /**
- * Coarri Codeco (CoCoCont) CEISA 4.0 — TPS Online Dashboard
- * Halaman penarikan data Gate-In & Gate-Out dari database TPP, pembentukan JSON CEISA 4.0, dan pengiriman ke REST API Bea Cukai.
+ * Coarri Codeco Kemasan (CoCoKms) CEISA 4.0 — TPS Online Dashboard
+ * Halaman penarikan data Gate-In (Stripping) & Gate-Out (Pengeluaran Gudang) kemasan dari database primamas,
+ * pembentukan JSON standar CEISA 4.0, integrasi jQuery DataTables (2 Tab), dan pengiriman ke REST API Gateway Bea Cukai.
  */
+
 require_once __DIR__ . '/includes/session.php';
 require_once __DIR__ . '/includes/helpers.php';
-
-requireAuth();
-
 $config = require __DIR__ . '/config.php';
 $endpoints = getEndpointDefinitions();
+
 $username = $_SESSION['name'] ?? $_SESSION['username'] ?? $config['username'] ?? 'User';
-$loginTime = $_SESSION['login_time'] ?? time();
 $userInitial = strtoupper(substr($username, 0, 2));
 
-$defaultEndpoint = 'coarri-codeco-container';
+$defaultEndpoint = 'coarri-codeco-kemasan';
 $todayDate = date('Y-m-d');
 ?>
 <!DOCTYPE html>
@@ -22,11 +21,12 @@ $todayDate = date('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coarri Codeco (CoCoCont) CEISA 4.0 — <?= e($config['app_name']) ?></title>
+    <title>Coarri Codeco (Kemasan) CEISA 4.0 — <?= e($config['app_name']) ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css?v=<?= time() ?>">
+    <!-- jQuery & DataTables CDN -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
@@ -74,7 +74,7 @@ $todayDate = date('Y-m-d');
         }
         .coco-container {
             padding: 24px 24px 80px 24px;
-            max-width: 1400px;
+            max-width: 1560px;
             margin: 0 auto;
         }
         .coco-card {
@@ -146,58 +146,6 @@ $todayDate = date('Y-m-d');
         .input-control:focus {
             outline: none;
             border-color: var(--accent-blue);
-        }
-        .btn-fetch {
-            padding: 10px 24px;
-            background: var(--accent-blue-gradient);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            transition: transform 0.15s, opacity 0.15s;
-            height: 44px;
-            white-space: nowrap;
-        }
-        .btn-fetch:hover {
-            opacity: 0.92;
-            transform: translateY(-1px);
-        }
-        .btn-fetch:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .btn-generate-json {
-            padding: 10px 22px;
-            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s ease;
-            height: 44px;
-            white-space: nowrap;
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.35);
-        }
-        .btn-generate-json:hover {
-            opacity: 0.92;
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.45);
-        }
-        .btn-generate-json:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
         }
         .stats-bar {
             display: grid;
@@ -369,14 +317,39 @@ $todayDate = date('Y-m-d');
         .header-tag strong {
             color: var(--text-primary);
         }
+        .bl-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.1);
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-copy-mini {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: color 0.15s;
+        }
+        .btn-copy-mini:hover {
+            color: var(--text-primary);
+        }
     </style>
 </head>
-<body data-login-time="<?= $loginTime ?>">
+<body>
     <div class="dashboard">
         <!-- Sidebar Overlay (Mobile) -->
         <div class="sidebar-overlay"></div>
 
-        <!-- ===== SIDEBAR ===== -->
+        <!-- Sidebar -->
         <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
         <!-- ===== MAIN CONTENT ===== -->
@@ -388,9 +361,9 @@ $todayDate = date('Y-m-d');
                     <div class="header-breadcrumb">
                         <span>CEISA 4.0</span>
                         <span class="separator">/</span>
-                        <span>Coarri Codeco</span>
+                        <span>Transaksi</span>
                         <span class="separator">/</span>
-                        <span class="current" id="breadcrumb-title">Container In & Out</span>
+                        <span class="current">Coarri Codeco (Kemasan)</span>
                     </div>
                 </div>
                 <div class="header-right">
@@ -413,36 +386,39 @@ $todayDate = date('Y-m-d');
             <!-- Main Body -->
             <main class="content-area">
                 <div class="coco-container">
-                    
-                    <!-- Form Filter Panel -->
+
+                    <!-- Filter Control Card -->
                     <div class="coco-card">
                         <div style="margin-bottom: 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                             <div>
-                                <h2 style="margin:0; font-size:1.25rem; color:var(--text-primary); font-weight:700;">
-                                    📦 Coarri Codeco Container (CoCoCont)
+                                <h2 style="margin:0; font-size:1.25rem; color:var(--text-primary); font-weight:700; display:flex; align-items:center; gap:8px;">
+                                    <span>📦</span> Coarri Codeco Kemasan (CoCoKms)
                                 </h2>
                                 <p style="margin:4px 0 0; color:var(--text-secondary); font-size:0.88rem;">
-                                    Tarik data Gate-In / Gate-Out dari database operasional TPP & bentuk payload sesuai standar REST API CEISA 4.0.
+                                    Tarik data Gate-In Stripping & Gate-Out Pengeluaran Gudang kemasan LCL & bentuk payload sesuai standar REST API CEISA 4.0.
                                 </p>
                             </div>
                             <div style="display:flex; gap:10px; align-items:center;">
-                                <a href="report.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-                                    <span>📊</span> Laporan CoCoCont
+                                <a href="report_kms.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                                    <span>📊</span> Laporan CoCoKms
                                 </a>
-                                <span class="badge-pill badge-ceisa">POST /coarri-codeco-container</span>
+                                <span class="badge-pill badge-ceisa">
+                                    POST /coarri-codeco-kemasan
+                                </span>
                             </div>
                         </div>
 
-                        <form id="filter-form" onsubmit="event.preventDefault(); fetchData();">
+                        <!-- Form Filter -->
+                        <form id="filter-form" onsubmit="event.preventDefault(); loadDataKms();">
                             <div class="filter-grid">
                                 <div>
                                     <label style="display:block; font-size:0.82rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase;">Tipe Pergerakan</label>
                                     <div class="type-toggle-group">
                                         <button type="button" class="type-btn active" id="btn-type-in" onclick="setType('In')">
-                                            <span>📥</span> Gate-In (Masuk)
+                                            <span>📥</span> Gate-In (Stripping)
                                         </button>
                                         <button type="button" class="type-btn" id="btn-type-out" onclick="setType('Out')">
-                                            <span>📤</span> Gate-Out (Keluar)
+                                            <span>📤</span> Gate-Out (Pengeluaran)
                                         </button>
                                     </div>
                                     <input type="hidden" id="type-input" value="In">
@@ -470,7 +446,7 @@ $todayDate = date('Y-m-d');
                     <!-- Stats Row -->
                     <div class="stats-bar" id="stats-bar" style="display:none;">
                         <div class="stat-item">
-                            <span class="stat-label">Total Kontainer</span>
+                            <span class="stat-label">Total Kemasan</span>
                             <span class="stat-value" id="stat-count" style="color:var(--accent-blue);">0</span>
                         </div>
                         <div class="stat-item">
@@ -494,7 +470,7 @@ $todayDate = date('Y-m-d');
                         <!-- Tabs -->
                         <div class="tabs-nav">
                             <button class="tab-btn active" onclick="switchTab('tab-table', this)">
-                                <span>📋</span> Pratinjau Tabel Kontainer (<span id="tab-count">0</span>)
+                                <span>📋</span> Pratinjau Tabel Kemasan (<span id="tab-count">0</span>)
                             </button>
                             <button class="tab-btn" onclick="switchTab('tab-json', this)">
                                 <span>📦</span> JSON Payload CEISA 4.0
@@ -505,24 +481,25 @@ $todayDate = date('Y-m-d');
                         <div class="tab-content active" id="tab-table">
                             <div style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                                 <div style="font-size:0.88rem; color:var(--text-secondary);">
-                                    <span>Tabel Interaktif Kontainer (Sorting, Filter & Pagination DataTables aktif)</span>
+                                    <span>Tabel Interaktif Kemasan (Sorting, Real-Time Filter & Pagination DataTables aktif)</span>
                                 </div>
-                                <button type="button" class="btn-action-sm" style="color:#c4b5fd; border-color:rgba(139,92,246,0.4); background:rgba(139,92,246,0.12);" onclick="switchTab('tab-json', document.querySelectorAll('.tab-btn')[1])">
+                                <button type="button" class="btn-action-sm" style="color:var(--accent-blue); border-color:rgba(59,130,246,0.4); background:rgba(59,130,246,0.12);" onclick="switchTab('tab-json', document.querySelectorAll('.tab-btn')[1])">
                                     <span>⚡</span> Buka JSON Payload
                                 </button>
                             </div>
                             <div class="table-responsive">
-                                <table class="data-table display responsive nowrap" id="table-kontainer" style="width:100%;">
+                                <table class="data-table display responsive nowrap" id="table-kms" style="width:100%;">
                                     <thead>
                                         <tr>
-                                            <th style="width:50px; text-align:center;">No</th>
-                                            <th>No. Kontainer</th>
-                                            <th>Ukuran</th>
-                                            <th>Jenis</th>
-                                            <th>Status</th>
+                                            <th style="width:40px; text-align:center;">No</th>
+                                            <th>Nomor B/L AWB</th>
+                                            <th>Master B/L</th>
+                                            <th>Kemasan</th>
+                                            <th>Bruto (KG)</th>
+                                            <th>Pos BC 1.1</th>
+                                            <th>Kontainer Asal</th>
                                             <th>No. Polisi</th>
                                             <th>Dokumen In/Out</th>
-                                            <th>No. BC 1.1</th>
                                             <th>Consignee</th>
                                             <th>Waktu In/Out</th>
                                         </tr>
@@ -541,11 +518,11 @@ $todayDate = date('Y-m-d');
                                 <!-- Rendered via JS -->
                             </div>
 
-                            <textarea id="json-viewer" class="json-box" spellcheck="false"></textarea>
+                            <textarea id="json-viewer" class="json-box" spellcheck="false" placeholder="Payload JSON akan otomatis terbentuk saat data ditarik..."></textarea>
 
                             <div class="action-row">
                                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                                    <button type="button" class="btn-action-sm" style="background:rgba(139,92,246,0.15); color:#c4b5fd; border-color:rgba(139,92,246,0.4);" onclick="fetchData('json')">
+                                    <button type="button" class="btn-action-sm" style="background:rgba(59,130,246,0.15); color:var(--accent-blue); border-color:rgba(59,130,246,0.4);" onclick="loadDataKms(true)">
                                         <span>⚡</span> Re-generate JSON
                                     </button>
                                     <button type="button" class="btn-action-sm" onclick="copyJson()">
@@ -554,11 +531,11 @@ $todayDate = date('Y-m-d');
                                     <button type="button" class="btn-action-sm" onclick="downloadJson()">
                                         <span>💾</span> Unduh .json
                                     </button>
-                                    <button type="button" class="btn-action-sm" onclick="validateJsonStructure()">
+                                    <button type="button" class="btn-action-sm" onclick="validateSchema()">
                                         <span>🔍</span> Validasi Skema
                                     </button>
                                 </div>
-                                <span id="json-validity-badge" class="badge-pill badge-ceisa">Format Valid</span>
+                                <span id="schema-badge" class="badge-pill badge-ceisa">Struktur CEISA 4.0 Valid</span>
                             </div>
                         </div>
 
@@ -568,10 +545,10 @@ $todayDate = date('Y-m-d');
                                 <label style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px;">
                                     TARGET ENDPOINT CEISA 4.0 (OPENAPI):
                                 </label>
-                                <input type="text" id="target-endpoint" class="input-control" value="<?= e($defaultEndpoint) ?>" style="font-family:'JetBrains Mono',monospace; font-size:0.88rem;">
+                                <input type="text" id="target-endpoint" class="input-control" value="<?= e($defaultEndpoint) ?>" readonly style="font-family:'JetBrains Mono',monospace; font-size:0.88rem;">
                             </div>
                             <div>
-                                <button type="button" class="btn-send-prod" id="btn-send" onclick="sendToCeisa()">
+                                <button type="button" class="btn-send-prod" id="btn-send-ceisa" onclick="sendToCeisa()">
                                     <span id="send-spinner" style="display:none;">⏳</span>
                                     <span id="send-icon">🚀</span>
                                     <span>Kirim ke CEISA 4.0</span>
@@ -587,8 +564,8 @@ $todayDate = date('Y-m-d');
                                     <span id="send-timestamp" style="font-size:0.85rem; color:var(--text-secondary);"></span>
                                 </div>
                                 <div style="display:flex; gap:10px;">
-                                    <a href="report.php" class="btn-action-sm" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-                                        <span>📊</span> Buka Laporan Coarri Codeco
+                                    <a href="report_kms.php" class="btn-action-sm" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                                        <span>📊</span> Buka Laporan CoCoKms
                                     </a>
                                     <button type="button" class="btn-action-sm" onclick="$('#send-raw-response').slideToggle(200)">
                                         <span>📋</span> Toggle Raw Response
@@ -609,13 +586,10 @@ $todayDate = date('Y-m-d');
     <div class="toast-container" id="toast-container" style="position:fixed; bottom:24px; right:24px; z-index:9999; display:flex; flex-direction:column; gap:10px;"></div>
 
     <script>
+        let currentType = 'In';
         let currentPayload = null;
-        let tableRowsData = [];
-        let loadedParams = {
-            type: null,
-            tglAwal: null,
-            tglAkhir: null
-        };
+        let dataTableInstance = null;
+        let activeAjaxRequest = null;
 
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
@@ -624,26 +598,27 @@ $todayDate = date('Y-m-d');
             toast.style.borderRadius = '8px';
             toast.style.fontSize = '0.9rem';
             toast.style.fontWeight = '500';
-            toast.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
-            toast.style.transition = 'all 0.3s ease';
+            toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
             toast.style.display = 'flex';
             toast.style.alignItems = 'center';
             toast.style.gap = '10px';
+            toast.style.transition = 'all 0.3s ease';
+            toast.style.zIndex = '9999';
 
             if (type === 'success') {
                 toast.style.background = '#065f46';
-                toast.style.color = '#a7f3d0';
-                toast.style.border = '1px solid #10b981';
+                toast.style.color = '#34d399';
+                toast.style.border = '1px solid #059669';
                 toast.innerHTML = '<span>✅</span> ' + message;
             } else if (type === 'error') {
                 toast.style.background = '#7f1d1d';
-                toast.style.color = '#fecaca';
-                toast.style.border = '1px solid #ef4444';
+                toast.style.color = '#f87171';
+                toast.style.border = '1px solid #dc2626';
                 toast.innerHTML = '<span>❌</span> ' + message;
             } else {
-                toast.style.background = '#1e293b';
-                toast.style.color = '#e2e8f0';
-                toast.style.border = '1px solid #475569';
+                toast.style.background = '#1e3a8a';
+                toast.style.color = '#93c5fd';
+                toast.style.border = '1px solid #2563eb';
                 toast.innerHTML = '<span>ℹ️</span> ' + message;
             }
 
@@ -655,11 +630,17 @@ $todayDate = date('Y-m-d');
             }, 4000);
         }
 
-        let activeAjaxRequest = null;
+        function switchTab(tabId, btn) {
+            $('.tab-btn').removeClass('active');
+            $('.tab-content').removeClass('active');
+            if (btn) $(btn).addClass('active');
+            $('#' + tabId).addClass('active');
+        }
 
         function setType(type) {
             const prevType = $('#type-input').val();
             $('#type-input').val(type);
+            currentType = type;
 
             if (type === 'In') {
                 $('#btn-type-in').addClass('active');
@@ -669,142 +650,135 @@ $todayDate = date('Y-m-d');
                 $('#btn-type-in').removeClass('active');
             }
 
-            // Otomatis proses data baru via AJAX saat tipe pergerakan berpindah
             if (prevType !== type) {
-                autoFetchData('current', true);
+                loadDataKms(true);
             }
         }
 
-        function switchTab(tabId, btn) {
-            $('.tab-btn').removeClass('active');
-            $('.tab-content').removeClass('active');
-            if (btn) $(btn).addClass('active');
-            $('#' + tabId).addClass('active');
+        function updateStats(payload, count) {
+            if (!payload || count === 0) {
+                $('#stats-bar').hide();
+                return;
+            }
+            let totalBruto = 0;
+            let bc11Set = new Set();
+            if (payload.detil && Array.isArray(payload.detil)) {
+                payload.detil.forEach(d => {
+                    totalBruto += parseFloat(d.bruto || 0);
+                    if (d.nomorBc11) bc11Set.add(d.nomorBc11);
+                });
+            }
+            $('#stat-count').text(count);
+            $('#stat-bruto').text(Math.round(totalBruto).toLocaleString('id-ID') + ' KG');
+            $('#stat-groups').text(bc11Set.size || (payload.header && payload.header.nomorBc11 ? 1 : 0));
+            $('#stats-bar').show();
         }
 
-        function autoFetchData(targetTab = 'current', showNotification = true) {
-            const type = $('#type-input').val();
+        function renderHeaderTags(h) {
+            const container = document.getElementById('header-tags-container');
+            if (!container) return;
+            if (!h) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = `
+                <div class="header-tag">TPS: <strong>${h.kodeTps || 'PSU0'}</strong></div>
+                <div class="header-tag">Gudang: <strong>${h.kodeGudang || 'GPSU'}</strong></div>
+                <div class="header-tag">Kapal/Voyage: <strong>${h.namaAngkut || '-'} (${h.nomorVoyFlight || '-'})</strong></div>
+                <div class="header-tag">Call Sign: <strong>${h.callSign || '-'}</strong></div>
+                <div class="header-tag">BC 1.1: <strong>${h.nomorBc11 || '-'}</strong></div>
+                <div class="header-tag">Tgl Tiba: <strong>${h.tanggalTiba || '-'}</strong></div>
+            `;
+        }
+
+        function loadDataKms(showNotification = true) {
             const tglAwal = $('#tgl-awal').val();
             const tglAkhir = $('#tgl-akhir').val();
 
             if (!tglAwal || !tglAkhir) return;
 
-            // Batalkan request AJAX sebelumnya jika user cepat mengganti tanggal (prevent race-condition)
             if (activeAjaxRequest && activeAjaxRequest.readyState !== 4) {
                 activeAjaxRequest.abort();
             }
 
-            // Indikator UI loading
             $('#auto-sync-status').html('<span class="pulse-dot" style="background:#3b82f6;"></span> <span style="color:#60a5fa;">Memproses AJAX...</span>');
 
             activeAjaxRequest = $.ajax({
-                url: 'api/cococont.php',
+                url: 'api/cocokms.php',
                 type: 'GET',
                 data: {
                     action: 'fetch',
-                    type: type,
+                    type: currentType,
                     tglAwal: tglAwal,
                     tglAkhir: tglAkhir
                 },
                 dataType: 'json',
-                success: function(result) {
-                    if (!result.success) {
-                        showToast(result.message || 'Gagal memproses data database', 'error');
-                        $('#auto-sync-status').html('❌ <span style="color:#ef4444;">Gagal memuat</span>');
+                success: function(res) {
+                    if (!res.success) {
+                        $('#auto-sync-status').html('❌ <span style="color:#ef4444;">Gagal</span>');
+                        showToast(res.message || 'Gagal mengambil data kemasan', 'error');
+                        $('#stats-bar').hide();
+                        $('#result-card').hide();
                         return;
                     }
 
-                    loadedParams = { type, tglAwal, tglAkhir };
+                    currentPayload = res.payload;
+                    const rows = res.rows || [];
+                    const count = res.count || 0;
 
-                    if (result.count === 0) {
+                    if (count === 0) {
                         currentPayload = null;
-                        tableRowsData = [];
-                        if ($.fn.DataTable.isDataTable('#table-kontainer')) {
-                            $('#table-kontainer').DataTable().destroy();
+                        if ($.fn.DataTable.isDataTable('#table-kms')) {
+                            $('#table-kms').DataTable().destroy();
                             dataTableInstance = null;
                         }
                         $('#table-body').empty();
                         $('#stats-bar').hide();
                         $('#result-card').hide();
-                        $('#auto-sync-status').html('ℹ️ <span style="color:var(--text-secondary);">Tidak ada kontainer</span>');
+                        $('#auto-sync-status').html('ℹ️ <span style="color:var(--text-secondary);">Tidak ada data</span>');
                         if (showNotification) {
-                            showToast(`Tidak ada kontainer ${type === 'In' ? 'Gate-In' : 'Gate-Out'} pada rentang tanggal tersebut`, 'info');
+                            showToast(`Tidak ada data kemasan ${currentType === 'In' ? 'Gate-In' : 'Gate-Out'} pada rentang tanggal tersebut`, 'info');
                         }
                         return;
                     }
 
-                    // Sukses mengambil data
-                    currentPayload = result.payload;
-                    tableRowsData = result.table_data || [];
-
-                    // Update UI statistik
-                    $('#stats-bar').css('display', 'grid');
+                    $('#tab-count').text(count);
+                    $('#stats-bar').show();
                     $('#result-card').show();
 
-                    $('#stat-count').text(result.count);
-                    $('#tab-count').text(result.count);
-                    $('#stat-groups').text(result.groups_count);
+                    // Update stats & tags
+                    updateStats(currentPayload, count);
+                    renderHeaderTags(currentPayload ? currentPayload.header : null);
 
-                    const totalBruto = tableRowsData.reduce((sum, r) => sum + (r.bruto || 0), 0);
-                    $('#stat-bruto').text(new Intl.NumberFormat('id-ID').format(Math.round(totalBruto)) + ' KG');
+                    // Render Table
+                    renderDataTable(rows);
 
-                    // Render Tabel Kontainer
-                    renderTable(tableRowsData);
+                    // Render JSON Box
+                    $('#json-viewer').val(JSON.stringify(currentPayload, null, 4));
+                    $('#schema-badge').text('Struktur CEISA 4.0 Valid').removeClass('badge-out').addClass('badge-ceisa').css({
+                        background: 'rgba(16,185,129,0.15)',
+                        color: '#10b981',
+                        border: '1px solid rgba(16,185,129,0.3)'
+                    });
 
-                    // Render Header Tags & Isi JSON Viewer secara otomatis
-                    renderHeaderTags(result.payload.header);
-                    $('#json-viewer').val(JSON.stringify(result.payload, null, 4));
-
-                    $('#auto-sync-status').html('<span class="pulse-dot"></span> <span style="color:#10b981;">Tersinkron (' + result.count + ' kontainer)</span>');
-
-                    // Arahkan ke tab jika dipanggil secara spesifik
-                    if (targetTab === 'json') {
-                        const tabJsonBtn = $('.tab-btn').eq(1);
-                        if (tabJsonBtn.length) switchTab('tab-json', tabJsonBtn[0]);
-                        if (showNotification) showToast(`⚡ JSON CEISA 4.0 (${type === 'In' ? 'Gate-In' : 'Gate-Out'}, ${result.count} kontainer) siap!`, 'success');
-                    } else if (targetTab === 'table') {
-                        const tabTableBtn = $('.tab-btn').eq(0);
-                        if (tabTableBtn.length) switchTab('tab-table', tabTableBtn[0]);
-                        if (showNotification) showToast(`Berhasil memuat ${result.count} kontainer ${type === 'In' ? 'Gate-In' : 'Gate-Out'}!`, 'success');
-                    } else if (showNotification) {
-                        showToast(`Data ${type === 'In' ? 'Gate-In' : 'Gate-Out'} otomatis dimuat (${result.count} kontainer)`, 'info');
+                    $('#send-result-card').hide();
+                    $('#auto-sync-status').html('<span class="pulse-dot"></span> <span style="color:#10b981;">Tersinkron (' + count + ' Kemasan)</span>');
+                    if (showNotification) {
+                        showToast(`Ditemukan ${count} data kemasan (${currentType === 'In' ? 'Gate-In' : 'Gate-Out'})!`, 'success');
                     }
                 },
                 error: function(xhr, status, error) {
                     if (status === 'abort') return;
                     console.error('AJAX Error:', error);
-                    showToast('Terjadi kesalahan jaringan atau server: ' + error, 'error');
+                    showToast('Gagal terhubung ke api/cocokms.php: ' + error, 'error');
                     $('#auto-sync-status').html('❌ <span style="color:#ef4444;">Error koneksi</span>');
                 }
             });
         }
 
-        // Aliases untuk fungsi manual & pintasan
-        function fetchData(targetTab = 'table') {
-            autoFetchData(targetTab, true);
-        }
-
-        function generateJson() {
-            autoFetchData('json', true);
-        }
-
-        // jQuery Event Listeners Otomatis
-        $(document).ready(function() {
-            // 1. Ketika user berpindah tanggal awal atau tanggal akhir, otomatis proses via AJAX
-            $('#tgl-awal, #tgl-akhir').on('change', function() {
-                autoFetchData('current', true);
-            });
-
-            // 2. Otomatis proses dan tampilkan data saat halaman pertama kali dibuka
-            autoFetchData('current', false);
-        });
-
-        let dataTableInstance = null;
-
-        function renderTable(rows) {
-            // Hancurkan DataTable lama jika ada sebelum mengisi ulang
-            if ($.fn.DataTable.isDataTable('#table-kontainer')) {
-                $('#table-kontainer').DataTable().destroy();
+        function renderDataTable(rows) {
+            if ($.fn.DataTable.isDataTable('#table-kms')) {
+                $('#table-kms').DataTable().destroy();
                 dataTableInstance = null;
             }
 
@@ -815,30 +789,50 @@ $todayDate = date('Y-m-d');
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td style="text-align:center;">${idx + 1}</td>
-                    <td><strong>${r.noCont || '-'}</strong></td>
-                    <td>${r.size || '-'} ft</td>
-                    <td><span class="badge-pill" style="background:rgba(59,130,246,0.12); color:var(--accent-blue);">${r.jnsCont || 'FCL'}</span></td>
-                    <td><span class="badge-pill ${r.isKosong === 'Kosong' ? 'badge-out' : 'badge-in'}">${r.isKosong || 'Isi'}</span></td>
-                    <td>${r.noPol || '-'}</td>
-                    <td>${r.noDokInOut || '-'}</td>
-                    <td>${r.noBc11 || '-'}</td>
-                    <td>${r.consignee || '-'}</td>
-                    <td><small style="font-family:'JetBrains Mono',monospace;">${formatDateTime(r.wkInOut)}</small></td>
+                    <td>
+                        <span class="bl-badge">
+                            <span>${r.nomorBlAwb || '-'}</span>
+                            <button type="button" class="btn-copy-mini" onclick="copyText('${r.nomorBlAwb}')" title="Salin No. BL">📋</button>
+                        </span>
+                        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">${r.tanggalBlAwb || '-'}</div>
+                    </td>
+                    <td>
+                        <span style="font-family:'JetBrains Mono',monospace; font-size:0.85rem; color:var(--text-primary);">${r.nomorMasterBlAwb || '-'}</span>
+                    </td>
+                    <td>
+                        <span class="badge-pill" style="background:rgba(59,130,246,0.12); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3); font-weight:600;">
+                            ${r.jumlahKemasan}
+                        </span>
+                    </td>
+                    <td><strong>${r.bruto}</strong></td>
+                    <td><span style="font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${r.nomorPosBc11 || '-'}</span></td>
+                    <td><span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:#60a5fa;">${r.kontainerAsal || '-'}</span></td>
+                    <td><span class="badge-pill badge-ceisa">${r.nomorPolisi || '-'}</span></td>
+                    <td>
+                        <div style="font-size:0.82rem; color:var(--text-primary); font-weight:500;">${r.nomorDokInOut || '-'}</div>
+                    </td>
+                    <td>
+                        <div style="font-size:0.82rem; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${r.consignee}">
+                            ${r.consignee || '-'}
+                        </div>
+                    </td>
+                    <td>
+                        <span style="font-family:'JetBrains Mono',monospace; font-size:0.8rem; color:var(--text-secondary);">${r.waktuInOut || '-'}</span>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
 
-            // Inisialisasi DataTables dengan sorting, pagination, search, dan responsive
-            dataTableInstance = $('#table-kontainer').DataTable({
+            dataTableInstance = $('#table-kms').DataTable({
                 responsive: true,
                 pageLength: 10,
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Semua"]],
                 language: {
                     search: "Cari:",
-                    searchPlaceholder: "No kontainer, consignee...",
-                    lengthMenu: "Tampilkan _MENU_ baris",
-                    info: "Menampilkan _START_ s/d _END_ dari _TOTAL_ kontainer",
-                    infoEmpty: "Tidak ada data kontainer",
+                    searchPlaceholder: "No BL / Master / Pos / Polisi / Consignee...",
+                    lengthMenu: "Tampilkan _MENU_ data",
+                    info: "Menampilkan _START_ s/d _END_ dari _TOTAL_ kemasan",
+                    infoEmpty: "Tidak ada data kemasan",
                     infoFiltered: "(difilter dari _MAX_ total data)",
                     zeroRecords: "Tidak ada data yang cocok dengan pencarian",
                     paginate: {
@@ -853,177 +847,94 @@ $todayDate = date('Y-m-d');
             });
         }
 
-        function formatDateTime(str) {
-            if (!str || str.length < 8) return str || '-';
-            // Format input YYYYMMDDHHiiss ke format ramah pembaca
-            const y = str.substr(0, 4);
-            const m = str.substr(4, 2);
-            const d = str.substr(6, 2);
-            let time = '';
-            if (str.length >= 12) {
-                time = ' ' + str.substr(8, 2) + ':' + str.substr(10, 2);
-            }
-            return `${d}-${m}-${y}${time}`;
-        }
-
-        function renderHeaderTags(h) {
-            const container = document.getElementById('header-tags-container');
-            container.innerHTML = `
-                <div class="header-tag">Dokumen: <strong>${h.kodeDokumen === '5' ? 'Gate-In (5)' : 'Gate-Out (6)'}</strong></div>
-                <div class="header-tag">TPS: <strong>${h.kodeTps}</strong></div>
-                <div class="header-tag">Gudang: <strong>${h.kodeGudang}</strong></div>
-                <div class="header-tag">Kapal/Voyage: <strong>${h.namaAngkut || '-'} (${h.nomorVoyFlight || '-'})</strong></div>
-                <div class="header-tag">Call Sign: <strong>${h.callSign || '-'}</strong></div>
-                <div class="header-tag">BC 1.1: <strong>${h.noBc11 || '-'}</strong></div>
-                <div class="header-tag">Tgl Tiba: <strong>${h.tanggalTiba || '-'}</strong></div>
-            `;
+        function copyText(txt) {
+            if (!txt || txt === '-') return;
+            navigator.clipboard.writeText(txt).then(() => {
+                showToast(`Teks ${txt} disalin ke clipboard!`, 'success');
+            }).catch(e => {
+                showToast('Gagal menyalin: ' + e, 'error');
+            });
         }
 
         function copyJson() {
             const viewer = document.getElementById('json-viewer');
             viewer.select();
             navigator.clipboard.writeText(viewer.value).then(() => {
-                showToast('JSON berhasil disalin ke clipboard!', 'success');
-            }).catch(err => {
-                showToast('Gagal menyalin: ' + err, 'error');
+                showToast('Payload JSON berhasil disalin!', 'success');
+            }).catch(e => {
+                showToast('Gagal menyalin: ' + e, 'error');
             });
         }
 
         function downloadJson() {
             const viewer = document.getElementById('json-viewer');
-            const type = document.getElementById('type-input').value;
-            const tgl = document.getElementById('tgl-awal').value;
+            const tgl = $('#tgl-awal').val();
             const blob = new Blob([viewer.value], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `CEISA4_CoCoCont_${type}_${tgl}.json`;
+            a.download = `CEISA4_CoCoKms_${currentType}_${tgl}.json`;
             a.click();
             URL.revokeObjectURL(url);
             showToast('File JSON berhasil diunduh!', 'success');
         }
 
-        function validateJsonStructure() {
+        function validateSchema() {
             try {
                 const text = document.getElementById('json-viewer').value;
                 const parsed = JSON.parse(text);
-                if (!parsed.header || !parsed.kontainer || !Array.isArray(parsed.kontainer)) {
-                    throw new Error('Objek harus memiliki key "header" dan array "kontainer"');
+                if (!parsed.header || !parsed.detil || !Array.isArray(parsed.detil)) {
+                    throw new Error('Objek header dan array detil wajib ada');
                 }
-                
-                const dmyRegex = /^\d{2}-\d{2}-\d{4}$/;
-                const dtRegex = /^\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}$/;
-                const validJnsCont = ['FCL', 'LCL', '4', '7', '8'];
-
-                // Validate Header
-                const h = parsed.header;
-                if (!h.tanggalBc11 || !dmyRegex.test(h.tanggalBc11)) {
-                    throw new Error(`header.tanggalBc11 ("${h.tanggalBc11 || ''}") harus berformat dd-MM-yyyy`);
+                if (parsed.detil.length === 0) {
+                    showToast('Peringatan: Array detil kemasan kosong', 'info');
+                    return;
                 }
-                if (!h.tanggalTiba || !dmyRegex.test(h.tanggalTiba)) {
-                    throw new Error(`header.tanggalTiba ("${h.tanggalTiba || ''}") harus berformat dd-MM-yyyy`);
-                }
-
-                // Validate Containers
-                for (let i = 0; i < parsed.kontainer.length; i++) {
-                    const k = parsed.kontainer[i];
-                    const label = `Kontainer #${i + 1} (${k.nomorKontainer || 'No Cont Kosong'}):`;
-                    
-                    if (!validJnsCont.includes(k.jenisKontainer)) {
-                        throw new Error(`${label} jenisKontainer ("${k.jenisKontainer}") harus salah satu dari: FCL, LCL, 4, 7, 8`);
-                    }
-                    if (!k.gudangTujuan || !k.gudangTujuan.trim()) {
-                        throw new Error(`${label} gudangTujuan tidak boleh kosong`);
-                    }
-                    if (!k.nomorSegelBc || !k.nomorSegelBc.trim()) {
-                        throw new Error(`${label} nomorSegelBc tidak boleh kosong`);
-                    }
-                    if (!k.tanggalSegelBc || !dmyRegex.test(k.tanggalSegelBc)) {
-                        throw new Error(`${label} tanggalSegelBc ("${k.tanggalSegelBc || ''}") harus berformat dd-MM-yyyy`);
-                    }
-                    if (!k.nomorSegel || !k.nomorSegel.trim()) {
-                        throw new Error(`${label} nomorSegel tidak boleh kosong`);
-                    }
-                    if (!k.idConsignee || !k.idConsignee.trim()) {
-                        throw new Error(`${label} idConsignee tidak boleh kosong`);
-                    }
-                    if (!k.nomorDaftarPabean || !k.nomorDaftarPabean.trim()) {
-                        throw new Error(`${label} nomorDaftarPabean tidak boleh kosong`);
-                    }
-                    if (k.nomorDaftarPabean.trim().length > 10) {
-                        throw new Error(`${label} nomorDaftarPabean ("${k.nomorDaftarPabean}") maksimal 10 karakter`);
-                    }
-                    if (!k.tanggalDaftarPabean || !dmyRegex.test(k.tanggalDaftarPabean)) {
-                        throw new Error(`${label} tanggalDaftarPabean ("${k.tanggalDaftarPabean || ''}") harus berformat dd-MM-yyyy`);
-                    }
-                    if (!k.waktuInOut || !dtRegex.test(k.waktuInOut)) {
-                        throw new Error(`${label} waktuInOut ("${k.waktuInOut || ''}") harus berformat dd-MM-yyyy HH:mm:ss`);
-                    }
-                    if (!k.tanggalDokumenInOut || !dmyRegex.test(k.tanggalDokumenInOut)) {
-                        throw new Error(`${label} tanggalDokumenInOut ("${k.tanggalDokumenInOut || ''}") harus berformat dd-MM-yyyy`);
-                    }
-                    if (!k.tanggalBlAwb || !dmyRegex.test(k.tanggalBlAwb)) {
-                        throw new Error(`${label} tanggalBlAwb ("${k.tanggalBlAwb || ''}") harus berformat dd-MM-yyyy`);
-                    }
-                    if (!k.tanggalMasterBlAwb || !dmyRegex.test(k.tanggalMasterBlAwb)) {
-                        throw new Error(`${label} tanggalMasterBlAwb ("${k.tanggalMasterBlAwb || ''}") harus berformat dd-MM-yyyy`);
-                    }
-                    if (!k.tanggalIjinTps || !dmyRegex.test(k.tanggalIjinTps)) {
-                        throw new Error(`${label} tanggalIjinTps ("${k.tanggalIjinTps || ''}") harus berformat dd-MM-yyyy`);
-                    }
-                }
-
-                showToast(`✅ Struktur & parameter JSON 100% valid! (Header & ${parsed.kontainer.length} kontainer sesuai standar CEISA 4.0)`, 'success');
+                showToast(`Validasi sukses! Terverifikasi ${parsed.detil.length} item kemasan siap dikirim.`, 'success');
             } catch (e) {
-                showToast('Validasi Gagal: ' + e.message, 'error');
+                showToast('Validasi gagal: ' + e.message, 'error');
             }
         }
 
         async function sendToCeisa() {
-            if (!currentPayload) {
-                showToast('Silakan tarik data terlebih dahulu!', 'error');
-                return;
-            }
-
-            const targetEndpoint = document.getElementById('target-endpoint').value.trim();
-            if (!targetEndpoint) {
-                showToast('Target endpoint tidak boleh kosong!', 'error');
-                return;
-            }
-
-            // Update payload dari textarea jika user melakukan edit manual
+            // Ambil data terbaru dari JSON viewer jika user melakukan modifikasi manual
             try {
-                currentPayload = JSON.parse(document.getElementById('json-viewer').value);
+                const viewerText = document.getElementById('json-viewer').value;
+                if (viewerText && viewerText.trim().startsWith('{')) {
+                    currentPayload = JSON.parse(viewerText);
+                }
             } catch (e) {
-                showToast('Format JSON pada editor tidak valid: ' + e.message, 'error');
+                console.warn('Memakai currentPayload dari memory:', e);
+            }
+
+            if (!currentPayload || !currentPayload.detil || currentPayload.detil.length === 0) {
+                showToast('Tidak ada data kemasan untuk dikirim!', 'error');
                 return;
             }
 
-            const confirmSend = confirm(`Apakah Anda yakin ingin mengirim ${currentPayload.kontainer.length} kontainer ke CEISA 4.0?\n\nEndpoint: ${targetEndpoint}`);
-            if (!confirmSend) return;
+            if (!confirm(`Konfirmasi: Kirim ${currentPayload.detil.length} data kemasan (${currentType}) ke server CEISA 4.0?`)) {
+                return;
+            }
 
-            const btnSend = document.getElementById('btn-send');
+            const btnSend = document.getElementById('btn-send-ceisa');
             const spinner = document.getElementById('send-spinner');
             const icon = document.getElementById('send-icon');
 
             btnSend.disabled = true;
-            spinner.style.display = 'inline-block';
-            icon.style.display = 'none';
+            if (spinner) spinner.style.display = 'inline-block';
+            if (icon) icon.style.display = 'none';
 
             try {
                 showToast('Mengirim payload ke CEISA 4.0...', 'info');
-                const res = await fetch('api/cococont.php?action=send', {
+
+                const response = await fetch('api/cocokms.php?action=send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        endpoint: targetEndpoint,
-                        payload: currentPayload
-                    })
+                    body: JSON.stringify({ payload: currentPayload })
                 });
 
-                const result = await res.json();
+                const result = await response.json();
 
-                // Tampilkan di Send Result Card
                 const resultCard = document.getElementById('send-result-card');
                 if (resultCard) resultCard.style.display = 'block';
 
@@ -1039,7 +950,7 @@ $todayDate = date('Y-m-d');
                 const msgEl = document.getElementById('send-result-msg');
                 if (msgEl) {
                     msgEl.innerHTML = result.success
-                        ? `✅ <strong>Berhasil Terkirim:</strong> ${result.message || 'Data kontainer telah terkirim ke CEISA 4.0'}. Anda dapat memverifikasinya di menu <a href="report.php" style="color:var(--accent-green); text-decoration:underline;">Laporan Coarri Codeco</a>.`
+                        ? `✅ <strong>Berhasil Terkirim:</strong> ${result.message || 'Data kemasan telah terkirim ke CEISA 4.0'}. Anda dapat memverifikasinya di menu <a href="report_kms.php" style="color:var(--accent-green); text-decoration:underline;">Laporan Coarri Codeco Kemasan</a>.`
                         : `❌ <strong>Gagal:</strong> ${result.message || 'Pengiriman ditolak oleh gateway CEISA 4.0'}`;
                 }
 
@@ -1050,18 +961,18 @@ $todayDate = date('Y-m-d');
                 }
 
                 if (result.success) {
-                    showToast('Pengiriman ke CEISA 4.0 berhasil!', 'success');
+                    showToast('Pengiriman Coarri Codeco Kemasan berhasil!', 'success');
                 } else {
-                    showToast('Pengiriman gagal: ' + (result.message || 'Periksa detail respon'), 'error');
+                    showToast(result.message || 'Pengiriman ditolak oleh server Bea Cukai', 'error');
                 }
 
-            } catch (err) {
-                console.error(err);
-                showToast('Terjadi kesalahan saat pengiriman: ' + err.message, 'error');
+            } catch (e) {
+                console.error('Send Error:', e);
+                showToast('Kesalahan koneksi saat mengirim: ' + e, 'error');
             } finally {
                 btnSend.disabled = false;
-                spinner.style.display = 'none';
-                icon.style.display = 'inline-block';
+                if (spinner) spinner.style.display = 'none';
+                if (icon) icon.style.display = 'inline-block';
             }
         }
 
@@ -1075,40 +986,45 @@ $todayDate = date('Y-m-d');
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast('Token berhasil diperbarui!', 'success');
+                    showToast('Token JWT berhasil diperbarui!', 'success');
                 } else {
-                    showToast('Gagal memperbarui token: ' + data.message, 'error');
+                    showToast(data.message || 'Gagal memperbarui token', 'error');
                 }
             } catch (e) {
-                showToast('Gagal terhubung ke API SSO', 'error');
+                showToast('Gagal terhubung ke server auth', 'error');
             }
         }
 
-        // Theme management
-        document.getElementById('theme-toggle').addEventListener('click', () => {
-            const cur = document.documentElement.getAttribute('data-theme') || 'dark';
-            const next = cur === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('ceisa_theme', next);
-            document.querySelector('.theme-toggle-icon').textContent = next === 'dark' ? '🌙' : '☀️';
-            document.querySelector('.theme-toggle-text').textContent = next === 'dark' ? 'Dark' : 'Light';
+        // Theme Toggle
+        document.getElementById('theme-toggle').addEventListener('click', function() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('ceisa_theme', newTheme);
+            this.querySelector('.theme-toggle-icon').textContent = newTheme === 'dark' ? '🌙' : '☀️';
+            this.querySelector('.theme-toggle-text').textContent = newTheme === 'dark' ? 'Dark' : 'Light';
         });
 
-        // Mobile menu toggle
-        const menuToggle = document.getElementById('menu-toggle');
-        if (menuToggle) {
-            menuToggle.addEventListener('click', () => {
-                document.querySelector('.sidebar').classList.toggle('open');
-                document.querySelector('.sidebar-overlay').classList.toggle('active');
+        // Mobile Menu Toggle
+        document.getElementById('menu-toggle')?.addEventListener('click', function() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        });
+
+        document.querySelector('.sidebar-overlay')?.addEventListener('click', function() {
+            document.querySelector('.sidebar').classList.remove('open');
+            this.classList.remove('active');
+        });
+
+        // jQuery Auto-Sync Listeners
+        $(document).ready(function() {
+            $('#tgl-awal, #tgl-akhir').on('change', function() {
+                loadDataKms(true);
             });
-        }
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (overlay) {
-            overlay.addEventListener('click', () => {
-                document.querySelector('.sidebar').classList.remove('open');
-                overlay.classList.remove('active');
-            });
-        }
+
+            // Load data otomatis saat pertama kali dibuka
+            loadDataKms(false);
+        });
     </script>
 </body>
 </html>
