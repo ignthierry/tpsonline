@@ -1,8 +1,8 @@
 <?php
 /**
- * Laporan Data Terkirim Kemasan (CoCoKms) CEISA 4.0
- * Endpoint: /cek-data-terkirim (Filtered: coarri-codeco-kemasan)
- * Terintegrasi dengan jQuery DataTables, Auto-Sync AJAX, dan Desain Modern Enterprise
+ * Laporan Data Terkirim Coarri Codeco Container (CoCoCont) CEISA 4.0
+ * Endpoint: /cek-data-terkirim
+ * Terintegrasi dengan jQuery DataTables, Auto-Sync AJAX, Modal Detail Rincian Kontainer, dan Desain Modern Enterprise
  */
 
 require_once __DIR__ . '/includes/session.php';
@@ -19,7 +19,7 @@ $todayDate = date('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan Coarri Codeco Kemasan (CoCoKms) CEISA 4.0 — <?= e($config['app_name']) ?></title>
+    <title>Laporan Coarri Codeco (CoCoCont) CEISA 4.0 — <?= e($config['app_name']) ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -227,10 +227,10 @@ $todayDate = date('Y-m-d');
             gap: 8px;
             justify-content: center;
         }
-        .btn-table-detail-kms {
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.18) 0%, rgba(124, 58, 237, 0.28) 100%);
-            color: #c4b5fd;
-            border: 1px solid rgba(139, 92, 246, 0.45);
+        .btn-table-detail {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(37, 99, 235, 0.28) 100%);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.45);
             padding: 6px 14px;
             border-radius: 20px;
             font-size: 0.82rem;
@@ -239,18 +239,18 @@ $todayDate = date('Y-m-d');
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            box-shadow: 0 2px 6px rgba(124, 58, 237, 0.15);
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
             transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
             white-space: nowrap;
         }
-        .btn-table-detail-kms:hover {
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(124, 58, 237, 0.42) 100%);
-            color: #ddd6fe;
-            border-color: #a78bfa;
+        .btn-table-detail:hover {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.42) 100%);
+            color: #93c5fd;
+            border-color: #60a5fa;
             transform: translateY(-2px);
-            box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
         }
-        .btn-table-detail-kms:active {
+        .btn-table-detail:active {
             transform: translateY(0);
         }
         .btn-table-copy {
@@ -356,9 +356,9 @@ $todayDate = date('Y-m-d');
             transition: all 0.2s;
         }
         .btn-subtab.active {
-            background: rgba(139, 92, 246, 0.15);
-            color: #c4b5fd;
-            border-bottom: 2px solid #8b5cf6;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border-bottom: 2px solid #3b82f6;
         }
     </style>
 </head>
@@ -379,13 +379,14 @@ $todayDate = date('Y-m-d');
                     <div class="header-breadcrumb">
                         <span>CEISA 4.0</span>
                         <span class="separator">/</span>
-                        <span>Laporan</span>
+                        <span>Laporan Coarri Codeco</span>
                         <span class="separator">/</span>
-                        <span class="current">Coarri Codeco (Kemasan)</span>
+                        <span class="current">Container (CoCoCont)</span>
                     </div>
                 </div>
+
                 <div class="header-right">
-                    <button class="theme-toggle" id="theme-toggle" title="Ubah Mode (Gelap / Terang)">
+                    <button class="theme-toggle-btn" id="theme-toggle" title="Ganti Tema">
                         <span class="theme-toggle-icon">🌙</span>
                         <span class="theme-toggle-text">Dark</span>
                     </button>
@@ -410,20 +411,20 @@ $todayDate = date('Y-m-d');
                         <div style="margin-bottom: 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                             <div>
                                 <h2 style="margin:0; font-size:1.25rem; color:var(--text-primary); font-weight:700;">
-                                    📊 Laporan Coarri Codeco Kemasan (CoCoKms)
+                                    📊 Laporan Coarri Codeco Container (CoCoCont)
                                 </h2>
                                 <p style="margin:4px 0 0; color:var(--text-secondary); font-size:0.88rem;">
-                                    Monitoring & verifikasi data pengiriman kemasan LCL (Gate-In Stripping / Gate-Out Pengeluaran) yang telah tersimpan di server CEISA 4.0.
+                                    Monitoring & verifikasi data pergerakan kontainer (Gate-In / Gate-Out) yang telah resmi tersimpan di server Bea Cukai CEISA 4.0.
                                 </p>
                             </div>
                             <div style="display:flex; gap:10px; align-items:center;">
-                                <a href="cocokms.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-                                    <span>📦</span> Menu CoCoKms
+                                <a href="cococont.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                                    <span>📦</span> Menu CoCoCont
                                 </a>
-                                <a href="report_cont.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; color:#93c5fd; border-color:rgba(59,130,246,0.3); background:rgba(59,130,246,0.1);">
-                                    <span>📊</span> Laporan Container
+                                <a href="report_kms.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; color:#c4b5fd; border-color:rgba(139,92,246,0.3); background:rgba(139,92,246,0.1);">
+                                    <span>📊</span> Laporan Kemasan
                                 </a>
-                                <span class="badge-pill badge-ceisa">coarri-codeco-kemasan</span>
+                                <span class="badge-pill badge-ceisa">coarri-codeco-container</span>
                             </div>
                         </div>
 
@@ -456,7 +457,7 @@ $todayDate = date('Y-m-d');
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Layanan / Service</span>
-                            <span class="stat-value" id="stat-service" style="font-size:1.15rem; color:var(--accent-purple);">coarri-codeco-kemasan</span>
+                            <span class="stat-value" id="stat-service" style="font-size:1.15rem; color:var(--accent-purple);">coarri-codeco-container</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Rentang Tanggal</span>
@@ -475,7 +476,7 @@ $todayDate = date('Y-m-d');
                         <!-- Tabs -->
                         <div class="tabs-nav">
                             <button class="tab-btn active" onclick="switchTab('tab-table', this)">
-                                <span>📋</span> Data Terkirim Kemasan (<span id="tab-count">0</span>)
+                                <span>📋</span> Data Terkirim CoCoCont (<span id="tab-count">0</span>)
                             </button>
                             <button class="tab-btn" onclick="switchTab('tab-json', this)">
                                 <span>📦</span> Respon JSON CEISA 4.0
@@ -486,7 +487,7 @@ $todayDate = date('Y-m-d');
                         <div class="tab-content active" id="tab-table">
                             <div style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                                 <div style="font-size:0.88rem; color:var(--text-secondary);">
-                                    <span>Tabel Interaktif Pengiriman Kemasan LCL (Sorting, Filter & Pagination DataTables aktif)</span>
+                                    <span>Tabel Interaktif Pengiriman Coarri Codeco Container (Sorting, Filter & Pagination DataTables aktif)</span>
                                 </div>
                                 <button type="button" class="btn-view-raw-json" onclick="switchTab('tab-json', document.querySelectorAll('.tab-btn')[1])" title="Buka respon lengkap JSON dari Gateway CEISA 4.0">
                                     <span class="icon-badge">⚡</span>
@@ -537,8 +538,8 @@ $todayDate = date('Y-m-d');
         </div>
     </div>
 
-    <!-- ===== MODAL DETAIL RINCIAN KEMASAN TERKIRIM ===== -->
-    <div id="modal-detail-kms" class="modal-overlay" onclick="handleModalOverlayClick(event)">
+    <!-- ===== MODAL DETAIL RINCIAN KONTAINER TERKIRIM ===== -->
+    <div id="modal-detail-cont" class="modal-overlay" onclick="handleModalOverlayClick(event)">
         <div class="modal-card">
             <!-- Modal Header -->
             <div style="padding:18px 24px; border-bottom:1px solid var(--border-medium); display:flex; justify-content:space-between; align-items:center; background:var(--bg-surface);">
@@ -546,12 +547,12 @@ $todayDate = date('Y-m-d');
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span style="font-size:1.35rem;">📦</span>
                         <h3 style="margin:0; font-size:1.15rem; color:var(--text-primary); font-weight:700;">
-                            Rincian Data Kemasan LCL Terkirim ke CEISA 4.0
+                            Rincian Data Kontainer Terkirim ke CEISA 4.0
                         </h3>
                     </div>
                     <div style="margin-top:5px; font-size:0.85rem; color:var(--text-secondary); display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                         <span>Ref Number:</span>
-                        <code id="modal-ref-number" style="font-family:'JetBrains Mono',monospace; color:var(--accent-purple); font-weight:700; font-size:0.92rem; background:rgba(139,92,246,0.12); padding:2px 8px; border-radius:4px;">-</code>
+                        <code id="modal-ref-number" style="font-family:'JetBrains Mono',monospace; color:var(--accent-blue); font-weight:700; font-size:0.92rem; background:rgba(59,130,246,0.12); padding:2px 8px; border-radius:4px;">-</code>
                         <span id="modal-status-pill" class="badge-pill badge-in" style="font-size:0.75rem;">✅ TERKIRIM & TERCATAT</span>
                     </div>
                 </div>
@@ -562,8 +563,8 @@ $todayDate = date('Y-m-d');
             <div style="padding:20px 24px; overflow-y:auto; flex-grow:1;">
                 <!-- Loading State -->
                 <div id="modal-loading" style="text-align:center; padding:40px 20px;">
-                    <span class="pulse-dot" style="width:12px; height:12px; background:#8b5cf6;"></span>
-                    <p style="margin-top:12px; color:var(--text-secondary); font-size:0.9rem;">Memuat rincian data kemasan dari database & log CEISA...</p>
+                    <span class="pulse-dot" style="width:12px; height:12px; background:#3b82f6;"></span>
+                    <p style="margin-top:12px; color:var(--text-secondary); font-size:0.9rem;">Memuat rincian data kontainer dari database & log CEISA...</p>
                 </div>
 
                 <!-- Main Content (when loaded) -->
@@ -591,7 +592,7 @@ $todayDate = date('Y-m-d');
                     <!-- Subtabs -->
                     <div style="display:flex; border-bottom:1px solid var(--border-medium); margin-bottom:16px; gap:8px;">
                         <button type="button" class="btn-subtab active" id="btn-subtab-table" onclick="switchModalTab('table')">
-                            📦 Daftar Kemasan (<span id="modal-kms-count">0</span>)
+                            📦 Daftar Kontainer (<span id="modal-cont-count">0</span>)
                         </button>
                         <button type="button" class="btn-subtab" id="btn-subtab-raw" onclick="switchModalTab('raw')">
                             ⚡ Respon & Payload Gateway
@@ -605,14 +606,14 @@ $todayDate = date('Y-m-d');
                                 <thead>
                                     <tr>
                                         <th style="width:40px; text-align:center;">No</th>
-                                        <th>Jenis & Kode</th>
-                                        <th>Jumlah Kemasan</th>
+                                        <th>Nomor Kontainer</th>
+                                        <th>Ukuran / Tipe</th>
+                                        <th>Status Muat</th>
                                         <th>Nomor B/L & Tgl</th>
                                         <th>Pos BC 1.1</th>
                                         <th>Consignee / Pemilik</th>
-                                        <th>Kontainer Asal</th>
                                         <th>No Polisi & Gate</th>
-                                        <th>No Segel BC</th>
+                                        <th>No Segel</th>
                                     </tr>
                                 </thead>
                                 <tbody id="modal-table-body">
@@ -645,7 +646,7 @@ $todayDate = date('Y-m-d');
     </div>
 
     <!-- Toast Notification Container -->
-    <div class="toast-container" id="toast-container" style="position:fixed; bottom:24px; right:24px; z-index:9999; display:flex; flex-direction:column; gap:10px;"></div>
+    <div class="toast-container" id="toast-container" style="position:fixed; bottom:24px; right:24px; z-index:999999; display:flex; flex-direction:column; gap:10px;"></div>
 
     <script>
         let rawApiResponse = null;
@@ -664,7 +665,7 @@ $todayDate = date('Y-m-d');
             toast.style.alignItems = 'center';
             toast.style.gap = '10px';
             toast.style.transition = 'all 0.3s ease';
-            toast.style.zIndex = '9999';
+            toast.style.zIndex = '999999';
 
             if (type === 'success') {
                 toast.style.background = '#065f46';
@@ -716,7 +717,7 @@ $todayDate = date('Y-m-d');
                 type: 'GET',
                 data: {
                     action: 'cek_terkirim',
-                    category: 'kemasan',
+                    category: 'container',
                     tanggalAwal: tglAwal,
                     tanggalAkhir: tglAkhir
                 },
@@ -735,7 +736,7 @@ $todayDate = date('Y-m-d');
                         $('#result-card').hide();
 
                         if (showNotification) {
-                            showToast(result.message || 'Tidak ada data pengiriman kemasan pada rentang tanggal tersebut', 'info');
+                            showToast(result.message || 'Tidak ada data terkirim pada rentang tanggal tersebut', 'info');
                         }
                         return;
                     }
@@ -751,7 +752,7 @@ $todayDate = date('Y-m-d');
                         $('#result-card').hide();
 
                         if (showNotification) {
-                            showToast(`Tidak ada referensi kemasan terkirim pada ${result.tglAwal} s/d ${result.tglAkhir}`, 'info');
+                            showToast(`Tidak ada referensi terkirim pada ${result.tglAwal} s/d ${result.tglAkhir}`, 'info');
                         }
                         return;
                     }
@@ -762,7 +763,7 @@ $todayDate = date('Y-m-d');
 
                     $('#stat-count').text(result.count + ' Ref Batch');
                     $('#tab-count').text(result.count);
-                    $('#stat-service').text(result.services.join(', ') || 'coarri-codeco-kemasan');
+                    $('#stat-service').text(result.services.join(', ') || 'coarri-codeco-container');
                     $('#stat-range').text(`${result.tglAwal} s/d ${result.tglAkhir}`);
 
                     // Render DataTables
@@ -771,23 +772,24 @@ $todayDate = date('Y-m-d');
                     // Render JSON Box
                     $('#json-viewer').val(JSON.stringify(rawApiResponse, null, 4));
 
-                    $('#auto-sync-status').html('<span class="pulse-dot"></span> <span style="color:#10b981;">Tersinkron (' + result.count + ' Ref Kemasan)</span>');
+                    $('#auto-sync-status').html('<span class="pulse-dot"></span> <span style="color:#10b981;">Terkonfirmasi (' + result.count + ' Ref Terkirim)</span>');
+
                     if (showNotification) {
-                        showToast(`Ditemukan ${result.count} data pengiriman kemasan terverifikasi CEISA 4.0!`, 'success');
+                        showToast(`Ditemukan ${result.count} referensi pengiriman resmi di CEISA 4.0!`, 'success');
                     }
                 },
                 error: function(xhr, status, error) {
                     if (status === 'abort') return;
                     console.error('AJAX Error:', error);
-                    showToast('Gagal terhubung ke API Report: ' + error, 'error');
-                    $('#auto-sync-status').html('❌ <span style="color:#ef4444;">Koneksi gagal</span>');
+                    showToast('Gagal terhubung ke API Gateway: ' + error, 'error');
+                    $('#auto-sync-status').html('❌ <span style="color:#ef4444;">Error koneksi API</span>');
                 }
             });
         }
 
         function renderReportTable(rows) {
-            if (dataTableInstance) {
-                dataTableInstance.destroy();
+            if ($.fn.DataTable.isDataTable('#table-report')) {
+                $('#table-report').DataTable().destroy();
                 dataTableInstance = null;
             }
 
@@ -800,28 +802,17 @@ $todayDate = date('Y-m-d');
                     <td style="text-align:center;">${idx + 1}</td>
                     <td>
                         <span class="ref-badge">
+                            <span>📄</span>
                             <span>${r.referenceNumber}</span>
-                            <button type="button" class="btn-copy-ref" onclick="copyText('${r.referenceNumber}')" title="Salin Ref Number">📋</button>
+                            <button type="button" class="btn-copy-ref" onclick="copyText('${r.referenceNumber}')" title="Salin Reference Number">📋</button>
                         </span>
                     </td>
-                    <td>
-                        <span class="badge-pill" style="background:rgba(139, 92, 246, 0.15); color:#a78bfa; border:1px solid rgba(139, 92, 246, 0.3); font-weight:600;">
-                            ${r.serviceLabel}
-                        </span>
-                    </td>
-                    <td>
-                        <span style="font-family:'JetBrains Mono',monospace; font-size:0.85rem; color:var(--text-secondary);">
-                            ${r.tglAwal} s/d ${r.tglAkhir}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="badge-pill badge-in">
-                            <span>✅ ${r.status}</span>
-                        </span>
-                    </td>
+                    <td><span class="badge-pill" style="background:rgba(139,92,246,0.12); color:#c4b5fd; border:1px solid rgba(139,92,246,0.3);">${r.serviceLabel || r.service}</span></td>
+                    <td><span style="font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${r.tglAwal} s/d ${r.tglAkhir}</span></td>
+                    <td><span class="badge-pill badge-in">✅ ${r.status}</span></td>
                     <td style="text-align:center; white-space:nowrap;">
                         <div class="btn-action-group">
-                            <button type="button" class="btn-table-detail-kms" onclick="openDetailModal('${r.referenceNumber}')" title="Lihat rincian lengkap data kemasan yang terkirim">
+                            <button type="button" class="btn-table-detail" onclick="openDetailModal('${r.referenceNumber}')" title="Lihat rincian lengkap data kontainer yang terkirim">
                                 <span>🔍</span>
                                 <span>Lihat Data</span>
                             </button>
@@ -840,13 +831,13 @@ $todayDate = date('Y-m-d');
                 pageLength: 10,
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Semua"]],
                 language: {
-                    search: "Cari Data:",
-                    searchPlaceholder: "Nomor Referensi...",
+                    search: "Cari:",
+                    searchPlaceholder: "Nomor referensi / dokumen...",
                     lengthMenu: "Tampilkan _MENU_ data",
-                    info: "Menampilkan _START_ s/d _END_ dari _TOTAL_ pengiriman",
+                    info: "Menampilkan _START_ s/d _END_ dari _TOTAL_ data referensi",
                     infoEmpty: "Tidak ada data pengiriman",
-                    infoFiltered: "(difilter dari _MAX_ total pengiriman)",
-                    zeroRecords: "Tidak ada nomor referensi yang sesuai",
+                    infoFiltered: "(difilter dari _MAX_ total data)",
+                    zeroRecords: "Tidak ada data yang cocok dengan pencarian",
                     paginate: {
                         first: "«",
                         previous: "‹",
@@ -859,10 +850,114 @@ $todayDate = date('Y-m-d');
             });
         }
 
+        // ===== MODAL DETAIL RINCIAN KONTAINER =====
+        function openDetailModal(refNumber) {
+            $('#modal-detail-cont').css('display', 'flex');
+            $('#modal-ref-number').text(refNumber);
+            $('#modal-loading').show();
+            $('#modal-content').hide();
+            switchModalTab('table');
+
+            $.ajax({
+                url: 'api/report.php',
+                type: 'GET',
+                data: {
+                    action: 'detail_cont_ref',
+                    refNumber: refNumber
+                },
+                dataType: 'json',
+                success: function(res) {
+                    $('#modal-loading').hide();
+                    $('#modal-content').show();
+
+                    if (!res.success) {
+                        showToast(res.message || 'Gagal memuat detail', 'error');
+                        return;
+                    }
+
+                    const header = res.header || {};
+                    const log = res.log || {};
+                    const containers = res.containers || [];
+
+                    $('#modal-bc11').text((header.noBc11 || '-') + (header.tanggalBc11 ? ' (' + header.tanggalBc11 + ')' : ''));
+                    $('#modal-sarana').text((header.namaAngkut || '-') + (header.nomorVoyFlight ? ' (' + header.nomorVoyFlight + ')' : ''));
+                    $('#modal-gudang').text((header.kodeGudang || 'CPSU') + ' / ' + (header.kodeTps || 'PSU0'));
+                    $('#modal-waktu-kirim').text(log.created_at || '-');
+                    $('#modal-cont-count').text(containers.length);
+
+                    // Render Tabel Kontainer di Modal
+                    const tbody = document.getElementById('modal-table-body');
+                    tbody.innerHTML = '';
+
+                    if (containers.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-secondary);">Tidak ada rincian kontainer yang tersimpan untuk referensi ini di database lokal.</td></tr>';
+                    } else {
+                        containers.forEach((c, i) => {
+                            const tr = document.createElement('tr');
+                            const isKosong = (c.jenisMuat && c.jenisMuat.toLowerCase().includes('empty'));
+                            tr.innerHTML = `
+                                <td style="text-align:center;">${i + 1}</td>
+                                <td><strong style="color:var(--text-primary); font-family:'JetBrains Mono',monospace;">${c.noCont}</strong></td>
+                                <td>${c.ukuran} <span class="badge-pill" style="font-size:10px; margin-left:4px;">${c.jenisCont}</span></td>
+                                <td><span class="badge-pill ${isKosong ? 'badge-out' : 'badge-in'}" style="font-size:10px;">${c.jenisMuat}</span></td>
+                                <td>
+                                    <div>${c.noBlAwb}</div>
+                                    <small style="color:var(--text-secondary); font-size:11px;">${c.tanggalBlAwb}</small>
+                                </td>
+                                <td><code style="font-size:11.5px; color:#38bdf8;">${c.nomorPosBc11}</code></td>
+                                <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${c.consignee}">${c.consignee}</td>
+                                <td>
+                                    <div>${c.nomorPolisi || '-'}</div>
+                                    <small style="color:var(--text-secondary); font-size:11px;">${c.waktuInOut || '-'}</small>
+                                </td>
+                                <td><span style="font-family:'JetBrains Mono',monospace; font-size:11px;">${c.noSegel}</span></td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+
+                    // Tampilkan Raw Log & Payload
+                    $('#modal-raw-viewer').text(JSON.stringify({
+                        referenceNumber: refNumber,
+                        header: header,
+                        log: log,
+                        containers: containers
+                    }, null, 4));
+                },
+                error: function(xhr, status, error) {
+                    $('#modal-loading').hide();
+                    showToast('Gagal terhubung untuk mengambil rincian: ' + error, 'error');
+                }
+            });
+        }
+
+        function closeDetailModal() {
+            $('#modal-detail-cont').hide();
+        }
+
+        function handleModalOverlayClick(e) {
+            if (e.target.id === 'modal-detail-cont') {
+                closeDetailModal();
+            }
+        }
+
+        function switchModalTab(tab) {
+            if (tab === 'table') {
+                $('#btn-subtab-table').addClass('active');
+                $('#btn-subtab-raw').removeClass('active');
+                $('#modal-subtab-table').show();
+                $('#modal-subtab-raw').hide();
+            } else {
+                $('#btn-subtab-raw').addClass('active');
+                $('#btn-subtab-table').removeClass('active');
+                $('#modal-subtab-table').hide();
+                $('#modal-subtab-raw').show();
+            }
+        }
+
         function copyText(txt) {
-            if (!txt) return;
             navigator.clipboard.writeText(txt).then(() => {
-                showToast(`Nomor referensi ${txt} disalin ke clipboard!`, 'success');
+                showToast(`Reference number ${txt} disalin ke clipboard!`, 'success');
             }).catch(e => {
                 showToast('Gagal menyalin: ' + e, 'error');
             });
@@ -874,7 +969,7 @@ $todayDate = date('Y-m-d');
             navigator.clipboard.writeText(viewer.value).then(() => {
                 showToast('Respon JSON berhasil disalin!', 'success');
             }).catch(e => {
-                showToast('Gagal menyalin JSON: ' + e, 'error');
+                showToast('Gagal menyalin: ' + e, 'error');
             });
         }
 
@@ -885,10 +980,10 @@ $todayDate = date('Y-m-d');
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `CEISA4_Report_Kemasan_${tgl}.json`;
+            a.download = `CEISA4_Laporan_CoCoCont_${tgl}.json`;
             a.click();
             URL.revokeObjectURL(url);
-            showToast('File JSON berhasil diunduh!', 'success');
+            showToast('JSON berhasil diunduh!', 'success');
         }
 
         async function refreshAccessToken() {
@@ -902,6 +997,7 @@ $todayDate = date('Y-m-d');
                 const data = await res.json();
                 if (data.success) {
                     showToast('Token JWT berhasil diperbarui!', 'success');
+                    loadReportData(true);
                 } else {
                     showToast(data.message || 'Gagal memperbarui token', 'error');
                 }
@@ -931,124 +1027,16 @@ $todayDate = date('Y-m-d');
             this.classList.remove('active');
         });
 
-        // Auto-sync AJAX saat tanggal berubah & load awal
+        // jQuery Auto-Sync Listeners
         $(document).ready(function() {
+            // Otomatis proses saat berpindah tanggal awal atau akhir
             $('#tgl-awal, #tgl-akhir').on('change', function() {
                 loadReportData(true);
             });
 
-            // Load data otomatis saat pertama kali dibuka
+            // Otomatis proses saat halaman pertama kali dibuka
             loadReportData(false);
         });
-
-        // Modal functions
-        function openDetailModal(refNumber) {
-            $('#modal-detail-kms').css('display', 'flex');
-            $('#modal-ref-number').text(refNumber);
-            $('#modal-loading').show();
-            $('#modal-content').hide();
-            switchModalTab('table');
-
-            $.ajax({
-                url: 'api/report.php',
-                type: 'GET',
-                data: {
-                    action: 'detail_kms_ref',
-                    refNumber: refNumber
-                },
-                dataType: 'json',
-                success: function(res) {
-                    $('#modal-loading').hide();
-                    $('#modal-content').show();
-
-                    if (!res.success) {
-                        showToast(res.message || 'Gagal memuat detail', 'error');
-                        return;
-                    }
-
-                    const header = res.header || {};
-                    const log = res.log || {};
-                    const packages = res.packages || [];
-
-                    $('#modal-bc11').text((header.nomorBc11 || header.noBc11 || '-') + (header.tanggalBc11 ? ' (' + header.tanggalBc11 + ')' : ''));
-                    $('#modal-sarana').text((header.namaAngkut || '-') + (header.nomorVoyFlight ? ' (' + header.nomorVoyFlight + ')' : ''));
-                    $('#modal-gudang').text((header.kodeGudang || 'GPSU') + ' / ' + (header.kodeTps || 'PSU0'));
-                    $('#modal-waktu-kirim').text(log.created_at || '-');
-                    $('#modal-kms-count').text(packages.length);
-
-                    // Render Tabel Kemasan di Modal
-                    const tbody = document.getElementById('modal-table-body');
-                    tbody.innerHTML = '';
-
-                    if (packages.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-secondary);">Tidak ada rincian kemasan yang tersimpan untuk referensi ini di database lokal.</td></tr>';
-                    } else {
-                        packages.forEach((p, i) => {
-                            const tr = document.createElement('tr');
-                            tr.innerHTML = `
-                                <td style="text-align:center;">${i + 1}</td>
-                                <td>
-                                    <span class="badge-pill" style="background:rgba(139,92,246,0.15); color:#c4b5fd; font-weight:700; font-family:'JetBrains Mono',monospace;">${p.jenisKemasan}</span>
-                                </td>
-                                <td>
-                                    <strong style="color:var(--text-primary); font-size:0.95rem;">${p.jumlahKemasan}</strong>
-                                    <span style="font-size:11px; color:var(--text-secondary); margin-left:2px;">pkg</span>
-                                </td>
-                                <td>
-                                    <div>${p.noBlAwb}</div>
-                                    <small style="color:var(--text-secondary); font-size:11px;">${p.tanggalBlAwb}</small>
-                                </td>
-                                <td><code style="font-size:11.5px; color:#38bdf8;">${p.nomorPosBc11}</code></td>
-                                <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${p.consignee}">${p.consignee}</td>
-                                <td><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#a78bfa;">${p.kontainerAsal || '-'}</span></td>
-                                <td>
-                                    <div>${p.nomorPolisi || '-'}</div>
-                                    <small style="color:var(--text-secondary); font-size:11px;">${p.waktuInOut || '-'}</small>
-                                </td>
-                                <td><span style="font-family:'JetBrains Mono',monospace; font-size:11px;">${p.noSegelBc || '-'}</span></td>
-                            `;
-                            tbody.appendChild(tr);
-                        });
-                    }
-
-                    // Tampilkan Raw Log & Payload
-                    $('#modal-raw-viewer').text(JSON.stringify({
-                        referenceNumber: refNumber,
-                        header: header,
-                        log: log,
-                        packages: packages
-                    }, null, 4));
-                },
-                error: function(xhr, status, error) {
-                    $('#modal-loading').hide();
-                    showToast('Gagal terhubung untuk mengambil rincian: ' + error, 'error');
-                }
-            });
-        }
-
-        function closeDetailModal() {
-            $('#modal-detail-kms').hide();
-        }
-
-        function handleModalOverlayClick(e) {
-            if (e.target.id === 'modal-detail-kms') {
-                closeDetailModal();
-            }
-        }
-
-        function switchModalTab(tab) {
-            if (tab === 'table') {
-                $('#btn-subtab-table').addClass('active');
-                $('#btn-subtab-raw').removeClass('active');
-                $('#modal-subtab-table').show();
-                $('#modal-subtab-raw').hide();
-            } else {
-                $('#btn-subtab-raw').addClass('active');
-                $('#btn-subtab-table').removeClass('active');
-                $('#modal-subtab-table').hide();
-                $('#modal-subtab-raw').show();
-            }
-        }
     </script>
 </body>
 </html>

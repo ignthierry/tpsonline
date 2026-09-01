@@ -310,9 +310,30 @@ function handleFetch() {
     // Kelompokkan baris data per Header (Key: noBc11 + noVoyFlight + nmAngkut)
     $groups = [];
     $rawList = [];
+    $contOccurrenceTracker = []; // Melacak kemunculan ke-berapa per nomor kontainer
+    $batchBuckets = [];          // Mengelompokkan kontainer ke Batch 1, Batch 2, dst.
+    $duplicateContMap = [];
     $refCounter = 1;
 
     foreach ($rows as $r) {
+        $noCont = strtoupper(trim((string)($r['NO_CONT'] ?? '')));
+        if (empty($noCont)) {
+            continue;
+        }
+
+        // Hitung frekuensi kemunculan kontainer ini untuk membagi ke batch bertahap
+        $occ = ($contOccurrenceTracker[$noCont] ?? 0) + 1;
+        $contOccurrenceTracker[$noCont] = $occ;
+        if ($occ > 1) {
+            $duplicateContMap[$noCont] = $occ;
+        }
+
+        // Tentukan batch index (kemunculan ke-1 masuk Batch 1, ke-2 masuk Batch 2, dst.)
+        $batchIdx = $occ;
+        if (!isset($batchBuckets[$batchIdx])) {
+            $batchBuckets[$batchIdx] = [];
+        }
+
         $groupKey = trim($r['NO_BC11'] . '|' . $r['NO_VOY_FLIGHT'] . '|' . $r['NM_ANGKUT']);
         if (!isset($groups[$groupKey])) {
             $groups[$groupKey] = [
@@ -419,8 +440,9 @@ function handleFetch() {
         ];
 
         $groups[$groupKey]['kontainer'][] = $kontainerItem;
+        $batchBuckets[$batchIdx][] = $kontainerItem;
 
-        // Data untuk tabel pratinjau di UI
+        // Data untuk tabel pratinjau di UI (semua 100% data ditampilkan)
         $rawList[] = [
             'noCont'           => $r['NO_CONT'],
             'size'             => $r['UK_CONT'],
@@ -433,7 +455,8 @@ function handleFetch() {
             'noBc11'           => $r['NO_BC11'],
             'voyage'           => $r['NM_ANGKUT'] . ' (' . $r['NO_VOY_FLIGHT'] . ')',
             'bruto'            => $brutoFloat,
-            'isKosong'         => $isKosong ? 'Kosong' : 'Isi'
+            'isKosong'         => $isKosong ? 'Kosong' : 'Isi',
+            'batchIndex'       => $batchIdx
         ];
     }
 
@@ -442,7 +465,7 @@ function handleFetch() {
     $allKontainer = [];
 
     $firstGroupKey = array_key_first($groups);
-    $firstInfo = $groups[$firstGroupKey]['header_info'];
+    $firstInfo = $groups[$firstGroupKey]['header_info'] ?? [];
 
     // Header default (tanggalBc11 & tanggalTiba dalam format dd-MM-yyyy)
     $defaultHeader = [
@@ -488,23 +511,44 @@ function handleFetch() {
         }
     }
 
-    // Payload utama standar CEISA 4.0
-    $singleCombinedPayload = [
-        'header' => $defaultHeader,
+    // Bangun daftar batches siap kirim bertahap (setiap batch dijamin 100% unik kontainer)
+    $batches = [];
+    ksort($batchBuckets);
+    foreach ($batchBuckets as $bIdx => $kList) {
+        $batchHeader = $defaultHeader;
+        // RefNumber unik per batch
+        $batchHeader['refNumber'] = 'PSU0' . $refDate . $tempPrefix . $timePart . ($bIdx > 1 ? $bIdx : '');
+        $batches[] = [
+            'batch_number'    => $bIdx,
+            'kontainer_count' => count($kList),
+            'payload'         => [
+                'header'    => $batchHeader,
+                'kontainer' => $kList
+            ]
+        ];
+    }
+
+    // Payload default yang ditampilkan di tab JSON (Batch 1)
+    $displayPayload = $batches[0]['payload'] ?? [
+        'header'    => $defaultHeader,
         'kontainer' => $allKontainer
     ];
 
     jsonResponse([
-        'success' => true,
-        'message' => 'Berhasil mengambil ' . count($rawList) . ' kontainer',
-        'type' => $type,
-        'tglAwal' => $tglAwal,
-        'tglAkhir' => $tglAkhir,
-        'count' => count($rawList),
-        'table_data' => $rawList,
-        'payload' => $singleCombinedPayload, // Format JSON CEISA 4.0 persis sesuai OpenAPI
-        'groups_count' => count($groups),
-        'payloads_by_group' => $payloads
+        'success'              => true,
+        'message'              => 'Berhasil mengambil ' . count($rawList) . ' kontainer' . (count($duplicateContMap) > 0 ? ' (' . count($batches) . ' batch pengiriman bertahap)' : ''),
+        'type'                 => $type,
+        'tglAwal'              => $tglAwal,
+        'tglAkhir'             => $tglAkhir,
+        'count'                => count($rawList),
+        'table_data'           => $rawList,
+        'payload'              => $displayPayload,
+        'batches'              => $batches,
+        'batches_count'        => count($batches),
+        'has_duplicates'       => count($duplicateContMap) > 0,
+        'duplicate_containers' => array_keys($duplicateContMap),
+        'groups_count'         => count($groups),
+        'payloads_by_group'    => $payloads
     ]);
 }
 
@@ -531,28 +575,120 @@ function handleSend() {
         $targetEndpoint = 'coarri-codeco-container';
     }
 
+    // Deduplikasi kontainer sebelum dikirim ke CEISA 4.0 agar tidak ditolak dengan error 'Duplikat Kontainer'
+    if (isset($payload['kontainer']) && is_array($payload['kontainer'])) {
+        $seenSendCont = [];
+        $filteredKontainer = [];
+        foreach ($payload['kontainer'] as $c) {
+            $contNo = strtoupper(trim((string)($c['nomorKontainer'] ?? '')));
+            if (empty($contNo)) continue;
+            if (isset($seenSendCont[$contNo])) {
+                continue; // Lewati kontainer duplikat
+            }
+            $seenSendCont[$contNo] = true;
+            $filteredKontainer[] = $c;
+        }
+        $payload['kontainer'] = $filteredKontainer;
+    }
+
     // Inisialisasi client CEISA
     $client = new CeisaClient();
     $result = $client->post($targetEndpoint, $payload);
 
-    // Catat log jika tabel log tersedia
+    $isOk = ($result['code'] >= 200 && $result['code'] < 300);
+
+    // Catat log & riwayat jika database tpsonline tersedia
     try {
         global $pdo_tpsonline;
         if ($pdo_tpsonline) {
-            $stmt = $pdo_tpsonline->prepare("INSERT INTO ceisa_api_logs 
-                (endpoint, request_params, response_code, response_message, raw_response, created_at) 
-                VALUES (:ep, :req, :code, :msg, :raw, NOW())");
-            $stmt->execute([
-                ':ep'   => 'POST:CoCoCont',
-                ':req'  => json_encode(['header' => $payload['header'], 'kontainer_count' => count($payload['kontainer'])]),
-                ':code' => $result['code'] ?? ($result['success'] ? 200 : 500),
-                ':msg'  => $result['message'] ?? 'OK',
-                ':raw'  => json_encode($result)
+            $kontainerList = $payload['kontainer'] ?? [];
+            $header = $payload['header'] ?? [];
+            $refNumber = $header['refNumber'] ?? '';
+
+            // 1. Simpan ke Master Audit Log (ceisa_api_logs)
+            $stmtLog = $pdo_tpsonline->prepare("
+                INSERT INTO ceisa_api_logs 
+                (endpoint, request_params, http_code, status, message, total_rows, raw_response, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $requestSummary = json_encode([
+                'header' => $header,
+                'kontainer_count' => count($kontainerList)
+            ], JSON_UNESCAPED_UNICODE);
+
+            $stmtLog->execute([
+                $targetEndpoint,
+                $requestSummary,
+                (int)($result['code'] ?? ($isOk ? 200 : 500)),
+                $isOk ? 'SUCCESS' : 'FAILED',
+                $result['message'] ?? ($isOk ? 'Berhasil' : 'Gagal'),
+                count($kontainerList),
+                json_encode($result['raw'] ?? $result, JSON_UNESCAPED_UNICODE)
             ]);
+
+            // 2. Simpan setiap kontainer ke ceisa_plp_kontainer & ceisa_sppb_kontainer HANYA jika pengiriman berhasil ke CEISA
+            if ($isOk) {
+                // Simpan ke ceisa_plp_kontainer
+                $stmtPlpCont = $pdo_tpsonline->prepare("
+                    INSERT INTO ceisa_plp_kontainer 
+                    (idTpsPlp, nomorKontainer, ukuranKontainer, jenisMuat, nomorPosBc11, nomorHostBl, tanggalHostBl, namaPemilik, flagSetuju)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+
+                // Simpan ke ceisa_sppb_kontainer
+                $stmtSppbCont = $pdo_tpsonline->prepare("
+                    INSERT INTO ceisa_sppb_kontainer 
+                    (car, no_sppb, no_cont, uk_cont, jns_cont, jns_muat, status_segel, no_segel, raw_data, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                ");
+
+                foreach ($kontainerList as $c) {
+                    $car = !empty($refNumber) ? $refNumber : ($c['nomorDokumenInOut'] ?? '');
+                    $noSppb = !empty($c['nomorDokumenInOut']) ? $c['nomorDokumenInOut'] : ($c['nomorDaftarPabean'] ?? '');
+                    $noCont = $c['nomorKontainer'] ?? '';
+                    $ukCont = $c['ukuranKontainer'] ?? '20';
+                    $jnsCont = $c['jenisKontainer'] ?? '4';
+                    $isKosong = !empty($c['flagKontainerKosong']) && ($c['flagKontainerKosong'] === true || $c['flagKontainerKosong'] == '1');
+                    $jnsMuat = $isKosong ? 'E' : 'F';
+                    $statusSegel = !empty($c['nomorSegelBc']) ? 'TERSEGEL' : 'TIDAK TERSEGEL';
+                    $noSegel = !empty($c['nomorSegel']) ? $c['nomorSegel'] : ($c['nomorSegelBc'] ?? '');
+                    $noPos = $c['nomorPosBc11'] ?? '';
+                    $noBl = $c['noBlAwb'] ?? '';
+                    $tglBl = $c['tanggalBlAwb'] ?? '';
+                    $consignee = substr(trim(preg_replace('/[\r\n\t]+/', ' ', (string)($c['consignee'] ?? ''))), 0, 100);
+                    $rawData = json_encode($c, JSON_UNESCAPED_UNICODE);
+
+                    // Eksekusi ceisa_plp_kontainer
+                    $stmtPlpCont->execute([
+                        $car,
+                        $noCont,
+                        $ukCont,
+                        $jnsMuat,
+                        $noPos,
+                        $noBl,
+                        $tglBl,
+                        $consignee,
+                        'Y'
+                    ]);
+
+                    // Eksekusi ceisa_sppb_kontainer
+                    $stmtSppbCont->execute([
+                        $car,
+                        $noSppb,
+                        $noCont,
+                        $ukCont,
+                        $jnsCont,
+                        $jnsMuat,
+                        $statusSegel,
+                        $noSegel,
+                        $rawData
+                    ]);
+                }
+            }
         }
     } catch (Exception $e) {
         // Jangan hentikan proses jika logging gagal
-        error_log("Gagal mencatat log POST CoCoCont: " . $e->getMessage());
+        error_log("Gagal mencatat log / ceisa_sppb_kontainer CoCoCont: " . $e->getMessage());
     }
 
     jsonResponse($result);

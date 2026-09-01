@@ -270,18 +270,24 @@ if ($action === 'fetch') {
 
         $detil = [];
         $tableRows = [];
-        $seenBL = [];
+        $blOccurrences = [];
+        $duplicateBLs = [];
+        $batches = [];
 
         foreach ($rawRows as $idx => $r) {
             $bl = trim((string)($r['NO_BL_AWB'] ?? ''));
             if (empty($bl)) {
                 continue;
             }
-            if (isset($seenBL[$bl])) {
-                // Jangan masukkan duplikat BL dalam satu dokumen CEISA 4.0
-                continue;
+
+            // Hitung kemunculan B/L untuk partisi multi-batch otomatis (agar tidak ada data yang dibuang)
+            $blOccurrences[$bl] = ($blOccurrences[$bl] ?? 0) + 1;
+            $occurrence = $blOccurrences[$bl];
+            $batchIndex = $occurrence - 1;
+
+            if ($occurrence > 1) {
+                $duplicateBLs[$bl] = $occurrence;
             }
-            $seenBL[$bl] = true;
 
             $tglBlAwb        = toCeisaDmy($r['TGL_BL_AWB'] ?? '');
             $tglMasterBlAwb  = toCeisaDmy($r['TGL_MASTER_BL_AWB'] ?? '');
@@ -340,7 +346,7 @@ if ($action === 'fetch') {
                 'tanggalBc11'           => $tglBc11,
                 'nomorPosBc11'          => (string)($r['NO_POS_BC11'] ?? ''),
                 'kontainerAsal'         => (string)($r['CONT_ASAL'] ?? ''),
-                'seriKemasan'           => (string)($r['SERI_KEMAS'] ?? '1'),
+                'seriKemasan'           => (string)($occurrence),
                 'kodeKemasan'           => (string)($r['KD_KEMAS'] ?? 'PK'),
                 'jumlahKemasan'         => (string)($r['JML_KEMAS'] ?? '1'),
                 'kodeTimbun'            => $kodeTimbun,
@@ -362,11 +368,28 @@ if ($action === 'fetch') {
                 'nomorIjinTps'          => (string)($r['NO_IJIN_TPS'] ?? ''),
                 'tanggalIjinTps'        => $tglIjinTps
             ];
-            $detil[] = $item;
 
-            // Baris tabel DataTables
+            // Inisialisasi batch jika belum ada
+            if (!isset($batches[$batchIndex])) {
+                $batchRef = ($batchIndex === 0) ? $refNumber : ($refNumber . ($batchIndex + 1));
+                $batchHeader = array_merge($header, ['refNumber' => $batchRef]);
+                $batches[$batchIndex] = [
+                    'batch_number'   => $batchIndex + 1,
+                    'refNumber'      => $batchRef,
+                    'kemasan_count'  => 0,
+                    'payload'        => [
+                        'header' => $batchHeader,
+                        'detil'  => []
+                    ]
+                ];
+            }
+
+            $batches[$batchIndex]['payload']['detil'][] = $item;
+            $batches[$batchIndex]['kemasan_count']++;
+
+            // Baris tabel DataTables (seluruh data ditampilkan tanpa ada yang dibuang)
             $tableRows[] = [
-                'no'               => count($detil),
+                'no'               => count($tableRows) + 1,
                 'idMasBl'          => $r['Id_MasBL'] ?? '',
                 'nomorBlAwb'       => $item['nomorBlAwb'],
                 'tanggalBlAwb'     => $item['tanggalBlAwb'],
@@ -378,20 +401,30 @@ if ($action === 'fetch') {
                 'nomorPolisi'      => $item['nomorPolisi'],
                 'nomorDokInOut'    => $item['nomorDokumenInOut'] . ($item['tanggalDokumenInOut'] ? ' (' . $item['tanggalDokumenInOut'] . ')' : ''),
                 'consignee'        => $item['consignee'],
-                'waktuInOut'       => $item['waktuInOut']
+                'waktuInOut'       => $item['waktuInOut'],
+                'batch'            => $occurrence,
+                'batchLabel'       => 'Batch ' . $occurrence,
+                'is_duplicate'     => ($occurrence > 1)
             ];
         }
 
+        $batchList = array_values($batches);
+        $totalBatches = count($batchList);
+        $hasDuplicates = !empty($duplicateBLs);
+
         jsonResponse([
-            'success' => true,
-            'count'   => count($detil),
-            'message' => 'Berhasil memuat ' . count($detil) . ' data kemasan',
-            'rows'    => $tableRows,
-            'payload' => [
-                'header' => $header,
-                'detil'  => $detil
-            ]
+            'success'          => true,
+            'count'            => count($tableRows),
+            'message'          => 'Berhasil memuat ' . count($tableRows) . ' data kemasan' . ($hasDuplicates ? " (dibagi $totalBatches batch karena ada B/L ganda)" : ''),
+            'rows'             => $tableRows,
+            'payload'          => $batchList[0]['payload'] ?? null,
+            'has_duplicates'   => $hasDuplicates,
+            'duplicate_bls'    => array_keys($duplicateBLs),
+            'duplicate_count'  => count($duplicateBLs),
+            'total_batches'    => $totalBatches,
+            'batches'          => $batchList
         ]);
+
 
     } catch (Exception $e) {
         error_log("Error cocokms fetch: " . $e->getMessage());
@@ -467,6 +500,91 @@ if ($action === 'send') {
         $res = $client->post('coarri-codeco-kemasan', $payload);
 
         $isOk = ($res['code'] >= 200 && $res['code'] < 300);
+
+        // Catat log & riwayat jika database tpsonline tersedia
+        try {
+            global $pdo_tpsonline;
+            if ($pdo_tpsonline) {
+                $detilList = $payload['detil'] ?? [];
+                $header = $payload['header'] ?? [];
+                $refNumber = $header['refNumber'] ?? '';
+
+                // 1. Simpan ke Master Audit Log (ceisa_api_logs)
+                $stmtLog = $pdo_tpsonline->prepare("
+                    INSERT INTO ceisa_api_logs 
+                    (endpoint, request_params, http_code, status, message, total_rows, raw_response, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                ");
+                $requestSummary = json_encode([
+                    'header' => $header,
+                    'detil_count' => count($detilList)
+                ], JSON_UNESCAPED_UNICODE);
+
+                $stmtLog->execute([
+                    'coarri-codeco-kemasan',
+                    $requestSummary,
+                    (int)($res['code'] ?? ($isOk ? 200 : 400)),
+                    $isOk ? 'SUCCESS' : 'FAILED',
+                    $res['message'] ?? ($isOk ? 'Berhasil' : 'Gagal'),
+                    count($detilList),
+                    json_encode($res['raw'] ?? $res, JSON_UNESCAPED_UNICODE)
+                ]);
+
+                // 2. Simpan setiap kemasan ke ceisa_plp_kemasan & ceisa_sppb_kemasan HANYA jika pengiriman berhasil ke CEISA
+                if ($isOk) {
+                    // Simpan ke ceisa_plp_kemasan
+                    $stmtPlpKem = $pdo_tpsonline->prepare("
+                        INSERT INTO ceisa_plp_kemasan 
+                        (idTpsPlp, jenisKemasan, jumlahKemasan, nomorPosBc11, nomorBlAwb, tanggalBlAwb, consignee, flagSetuju)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+
+                    // Simpan ke ceisa_sppb_kemasan
+                    $stmtSppbKem = $pdo_tpsonline->prepare("
+                        INSERT INTO ceisa_sppb_kemasan 
+                        (car, no_sppb, jml_kemasan, jns_kemasan, kd_jns_kemasan, raw_data, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, NOW())
+                    ");
+
+                    foreach ($detilList as $item) {
+                        $car = !empty($refNumber) ? $refNumber : ($item['nomorBlAwb'] ?? '');
+                        $noSppb = !empty($item['nomorDokumenInOut']) ? $item['nomorDokumenInOut'] : ($item['nomorDaftarPabean'] ?? '');
+                        $jmlKemasan = floatval($item['jumlahKemasan'] ?? 1);
+                        $jnsKemasan = $item['kodeKemasan'] ?? 'PK';
+                        $kdJnsKemasan = !empty($item['seriKemasan']) ? $item['seriKemasan'] : ($item['kodeKemasan'] ?? 'PK');
+                        $nomorPosBc11 = $item['nomorPosBc11'] ?? '';
+                        $nomorBlAwb = $item['nomorBlAwb'] ?? '';
+                        $tanggalBlAwb = $item['tanggalBlAwb'] ?? '';
+                        $consignee = $item['consignee'] ?? '';
+                        $rawData = json_encode($item, JSON_UNESCAPED_UNICODE);
+
+                        // Eksekusi ceisa_plp_kemasan
+                        $stmtPlpKem->execute([
+                            $car,
+                            $jnsKemasan,
+                            $jmlKemasan,
+                            $nomorPosBc11,
+                            $nomorBlAwb,
+                            $tanggalBlAwb,
+                            $consignee,
+                            'Y'
+                        ]);
+
+                        // Eksekusi ceisa_sppb_kemasan
+                        $stmtSppbKem->execute([
+                            $car,
+                            $noSppb,
+                            $jmlKemasan,
+                            $jnsKemasan,
+                            $kdJnsKemasan,
+                            $rawData
+                        ]);
+                    }
+                }
+            }
+        } catch (Exception $dbEx) {
+            error_log("Gagal mencatat log / simpan ceisa_plp_kemasan / ceisa_sppb_kemasan: " . $dbEx->getMessage());
+        }
 
         jsonResponse([
             'success' => $isOk,

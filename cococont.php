@@ -32,6 +32,7 @@ $todayDate = date('Y-m-d');
     <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         (function() {
             const savedTheme = localStorage.getItem('ceisa_theme') || 'dark';
@@ -426,7 +427,7 @@ $todayDate = date('Y-m-d');
                                 </p>
                             </div>
                             <div style="display:flex; gap:10px; align-items:center;">
-                                <a href="report.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                                <a href="report_cont.php" class="btn-action-sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
                                     <span>📊</span> Laporan CoCoCont
                                 </a>
                                 <span class="badge-pill badge-ceisa">POST /coarri-codeco-container</span>
@@ -562,8 +563,24 @@ $todayDate = date('Y-m-d');
                             </div>
                         </div>
 
+                        <!-- Multi-Batch Notice (Muncul jika ada kontainer multiple B/L) -->
+                        <div id="batch-notice-card" style="display:none; margin-top:20px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:10px; padding:14px 18px;">
+                            <div style="display:flex; align-items:flex-start; gap:12px;">
+                                <span style="font-size:1.3rem;">⚠️</span>
+                                <div style="flex-grow:1;">
+                                    <div style="font-weight:600; color:#f59e0b; font-size:0.92rem; margin-bottom:4px;">
+                                        Deteksi Pengiriman Bertahap (<span id="batch-count-badge">0</span> Batch Diperlukan)
+                                    </div>
+                                    <div style="font-size:0.85rem; color:var(--text-secondary); line-height:1.5;">
+                                        Terdeteksi nomor kontainer dengan multiple B/L / Pos BC 1.1 (<code id="batch-dup-containers" style="color:#f59e0b; background:rgba(245,158,11,0.15); padding:1px 6px; border-radius:4px;"></code>). 
+                                        Untuk mencegah error <em>"Duplikat Kontainer"</em> di CEISA 4.0 dan memastikan <strong>seluruh data terkirim 100% tanpa ada yang dikurangi</strong>, sistem membagi pengiriman menjadi <strong id="batch-count-text">2</strong> tahap secara otomatis.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Target Endpoint & Send Action Row -->
-                        <div class="action-row" style="background:var(--bg-surface); padding:16px 20px; border-radius:10px; margin-top:24px;">
+                        <div class="action-row" style="background:var(--bg-surface); padding:16px 20px; border-radius:10px; margin-top:20px;">
                             <div style="flex-grow:1; max-width:650px;">
                                 <label style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px;">
                                     TARGET ENDPOINT CEISA 4.0 (OPENAPI):
@@ -574,7 +591,7 @@ $todayDate = date('Y-m-d');
                                 <button type="button" class="btn-send-prod" id="btn-send" onclick="sendToCeisa()">
                                     <span id="send-spinner" style="display:none;">⏳</span>
                                     <span id="send-icon">🚀</span>
-                                    <span>Kirim ke CEISA 4.0</span>
+                                    <span id="btn-send-text">Kirim ke CEISA 4.0</span>
                                 </button>
                             </div>
                         </div>
@@ -587,7 +604,7 @@ $todayDate = date('Y-m-d');
                                     <span id="send-timestamp" style="font-size:0.85rem; color:var(--text-secondary);"></span>
                                 </div>
                                 <div style="display:flex; gap:10px;">
-                                    <a href="report.php" class="btn-action-sm" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                                    <a href="report_cont.php" class="btn-action-sm" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
                                         <span>📊</span> Buka Laporan Coarri Codeco
                                     </a>
                                     <button type="button" class="btn-action-sm" onclick="$('#send-raw-response').slideToggle(200)">
@@ -610,6 +627,9 @@ $todayDate = date('Y-m-d');
 
     <script>
         let currentPayload = null;
+        let currentBatches = [];
+        let duplicateContainersList = [];
+        let hasDuplicates = false;
         let tableRowsData = [];
         let loadedParams = {
             type: null,
@@ -735,7 +755,22 @@ $todayDate = date('Y-m-d');
 
                     // Sukses mengambil data
                     currentPayload = result.payload;
+                    currentBatches = result.batches || [];
+                    duplicateContainersList = result.duplicate_containers || [];
+                    hasDuplicates = !!result.has_duplicates;
                     tableRowsData = result.table_data || [];
+
+                    // Update Notice jika terdeteksi pengiriman multi-batch
+                    if (hasDuplicates && currentBatches.length > 1) {
+                        $('#batch-notice-card').slideDown(200);
+                        $('#batch-count-badge').text(result.batches_count);
+                        $('#batch-count-text').text(result.batches_count);
+                        $('#batch-dup-containers').text(duplicateContainersList.join(', '));
+                        $('#btn-send-text').text(`Kirim ke CEISA 4.0 (${result.batches_count} Batch)`);
+                    } else {
+                        $('#batch-notice-card').slideUp(200);
+                        $('#btn-send-text').text('Kirim ke CEISA 4.0');
+                    }
 
                     // Update UI statistik
                     $('#stats-bar').css('display', 'grid');
@@ -755,7 +790,7 @@ $todayDate = date('Y-m-d');
                     renderHeaderTags(result.payload.header);
                     $('#json-viewer').val(JSON.stringify(result.payload, null, 4));
 
-                    $('#auto-sync-status').html('<span class="pulse-dot"></span> <span style="color:#10b981;">Tersinkron (' + result.count + ' kontainer)</span>');
+                    $('#auto-sync-status').html('<span class="pulse-dot"></span> <span style="color:#10b981;">Tersinkron (' + result.count + ' kontainer' + (hasDuplicates ? ', ' + currentBatches.length + ' batch' : '') + ')</span>');
 
                     // Arahkan ke tab jika dipanggil secara spesifik
                     if (targetTab === 'json') {
@@ -980,8 +1015,14 @@ $todayDate = date('Y-m-d');
         }
 
         async function sendToCeisa() {
-            if (!currentPayload) {
-                showToast('Silakan tarik data terlebih dahulu!', 'error');
+            if (!currentPayload || !currentPayload.kontainer || currentPayload.kontainer.length === 0) {
+                Swal.fire({
+                    title: 'Belum Ada Data Kontainer',
+                    text: 'Tidak ada data kontainer yang terpilih. Silakan ubah filter tanggal atau klik Gate-In / Gate-Out untuk memuat data terlebih dahulu.',
+                    icon: 'info',
+                    confirmButtonColor: '#10b981',
+                    confirmButtonText: 'Mengerti'
+                });
                 return;
             }
 
@@ -991,24 +1032,235 @@ $todayDate = date('Y-m-d');
                 return;
             }
 
-            // Update payload dari textarea jika user melakukan edit manual
-            try {
-                currentPayload = JSON.parse(document.getElementById('json-viewer').value);
-            } catch (e) {
-                showToast('Format JSON pada editor tidak valid: ' + e.message, 'error');
-                return;
-            }
-
-            const confirmSend = confirm(`Apakah Anda yakin ingin mengirim ${currentPayload.kontainer.length} kontainer ke CEISA 4.0?\n\nEndpoint: ${targetEndpoint}`);
-            if (!confirmSend) return;
-
             const btnSend = document.getElementById('btn-send');
             const spinner = document.getElementById('send-spinner');
             const icon = document.getElementById('send-icon');
+            const type = $('#type-input').val() || 'In';
+
+            // 1. JIKA TERDETEKSI MULTI-BATCH KARENA KONTAINER DUPLIKAT (MULTIPLE B/L)
+            if (currentBatches && currentBatches.length > 1) {
+                const dupNames = duplicateContainersList.join(', ');
+                const totalAllCont = currentBatches.reduce((sum, b) => sum + b.kontainer_count, 0);
+
+                const confirmRes = await Swal.fire({
+                    title: 'Konfirmasi Pengiriman Bertahap',
+                    html: `
+                        <div style="text-align:left; font-size:13.5px; line-height:1.6;">
+                            <p style="margin-bottom:8px;">
+                                Terdeteksi <strong>${duplicateContainersList.length} nomor kontainer</strong> dengan multiple B/L / data pabean ganda:<br>
+                                <span style="display:inline-block; margin-top:4px; padding:3px 8px; background:rgba(245,158,11,0.15); color:#f59e0b; border-radius:4px; font-family:monospace; font-weight:600;">
+                                    ${dupNames}
+                                </span>
+                            </p>
+                            <p style="margin-bottom:8px;">
+                                Portal CEISA 4.0 membatasi agar tidak ada nomor kontainer yang sama dalam 1 pengiriman. 
+                                Agar <strong>seluruh ${totalAllCont} data kontainer tetap terkirim 100% tanpa ada yang dikurangi</strong>, pengiriman akan dijalankan dalam <strong>${currentBatches.length} kali pengiriman bertahap</strong>:
+                            </p>
+                            <div style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:10px; margin-bottom:10px;">
+                                ${currentBatches.map(b => `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px dashed rgba(255,255,255,0.1);">
+                                        <span>📦 <strong>Batch ${b.batch_number}</strong> (${b.kontainer_count} Kontainer)</span>
+                                        <code style="font-size:12px; color:#38bdf8;">${b.payload.header.refNumber}</code>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <p style="margin:0; font-size:12px; color:#94a3b8;">
+                                <em>Sistem akan mengirimkan Batch 1 terlebih dahulu, lalu otomatis melanjutkan Batch berikutnya hingga tuntas.</em>
+                            </p>
+                        </div>
+                    `,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: `🚀 Ya, Kirim ${currentBatches.length} Batch Sekarang`,
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#10b981',
+                    cancelButtonColor: '#64748b',
+                    reverseButtons: true
+                });
+
+                if (!confirmRes.isConfirmed) {
+                    return;
+                }
+
+                btnSend.disabled = true;
+                spinner.style.display = 'inline-block';
+                icon.style.display = 'none';
+
+                let batchResults = [];
+                let allSuccess = true;
+
+                for (let i = 0; i < currentBatches.length; i++) {
+                    const b = currentBatches[i];
+                    Swal.fire({
+                        title: `Mengirim Batch ${b.batch_number} dari ${currentBatches.length}...`,
+                        html: `Sedang mengirim <b>${b.kontainer_count} kontainer</b> ke CEISA 4.0...<br><span style="font-size:12px; font-family:monospace; color:#38bdf8;">Ref: ${b.payload.header.refNumber}</span>`,
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    try {
+                        const res = await fetch('api/cococont.php?action=send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                endpoint: targetEndpoint,
+                                payload: b.payload
+                            })
+                        });
+                        const result = await res.json();
+                        batchResults.push({
+                            batch: b.batch_number,
+                            ref: b.payload.header.refNumber,
+                            count: b.kontainer_count,
+                            success: result.success,
+                            code: result.code,
+                            message: result.message,
+                            raw: result
+                        });
+
+                        if (!result.success && result.code >= 400) {
+                            allSuccess = false;
+                            break;
+                        }
+                    } catch (err) {
+                        allSuccess = false;
+                        batchResults.push({
+                            batch: b.batch_number,
+                            ref: b.payload.header.refNumber,
+                            count: b.kontainer_count,
+                            success: false,
+                            code: 500,
+                            message: err.message,
+                            raw: { error: err.message }
+                        });
+                        break;
+                    }
+                }
+
+                btnSend.disabled = false;
+                spinner.style.display = 'none';
+                icon.style.display = 'inline-block';
+
+                // Tampilkan hasil di Card Respon Pengiriman
+                const resultCard = document.getElementById('send-result-card');
+                if (resultCard) resultCard.style.display = 'block';
+
+                const badge = document.getElementById('send-status-badge');
+                if (badge) {
+                    badge.className = 'badge-pill ' + (allSuccess ? 'badge-in' : 'badge-out');
+                    badge.textContent = allSuccess ? `SEMUA BATCH BERHASIL (${batchResults.length}/${currentBatches.length})` : `BATCH SEBAGIAN GAGAL`;
+                }
+
+                const timestampEl = document.getElementById('send-timestamp');
+                if (timestampEl) timestampEl.textContent = 'Waktu respon: ' + new Date().toLocaleString('id-ID');
+
+                const msgEl = document.getElementById('send-result-msg');
+                if (msgEl) {
+                    msgEl.innerHTML = `
+                        <div style="margin-bottom:8px;">
+                            ${allSuccess ? '✅ <strong>Seluruh Pengiriman Bertahap Selesai:</strong>' : '⚠️ <strong>Hasil Pengiriman Bertahap:</strong>'}
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            ${batchResults.map(r => `
+                                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.15); padding:6px 12px; border-radius:6px; font-size:0.85rem;">
+                                    <span>${r.success ? '✅' : '❌'} <strong>Batch ${r.batch}</strong> (${r.count} kontainer, Ref: <code>${r.ref}</code>)</span>
+                                    <span style="font-weight:600; color:${r.success ? '#10b981' : '#ef4444'};">${r.message || (r.success ? 'BERHASIL' : 'GAGAL')}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+                const rawEl = document.getElementById('send-raw-response');
+                if (rawEl) {
+                    rawEl.textContent = JSON.stringify(batchResults, null, 4);
+                    rawEl.style.display = 'block';
+                }
+
+                if (allSuccess) {
+                    Swal.fire({
+                        title: '🎉 Pengiriman Sukses!',
+                        html: `
+                            <div style="text-align:left; font-size:13.5px; line-height:1.6;">
+                                Seluruh <b>${batchResults.length} Batch (${totalAllCont} data kontainer)</b> telah <b>BERHASIL</b> terkirim ke CEISA 4.0 tanpa ada data yang terlewat!<br><br>
+                                Data telah dicatat ke database lokal dan dapat langsung dipantau di Laporan Coarri Codeco.
+                            </div>
+                        `,
+                        icon: 'success',
+                        showCancelButton: true,
+                        confirmButtonText: '📊 Buka Laporan Coarri Codeco',
+                        cancelButtonText: 'Tutup',
+                        confirmButtonColor: '#10b981',
+                        cancelButtonColor: '#64748b'
+                    }).then((r) => {
+                        if (r.isConfirmed) {
+                            window.location.href = 'report_cont.php';
+                        }
+                    });
+                    showToast('Semua batch kontainer berhasil dikirim!', 'success');
+                } else {
+                    Swal.fire({
+                        title: 'Pengiriman Terhenti',
+                        html: `
+                            <div style="text-align:left; font-size:13.5px;">
+                                <p>Terdapat kendala saat mengirim salah satu batch:</p>
+                                ${batchResults.map(r => `
+                                    <div style="padding:4px 0; color:${r.success ? '#10b981' : '#ef4444'};">
+                                        Batch ${r.batch}: ${r.message || (r.success ? 'Berhasil' : 'Gagal')}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `,
+                        icon: 'error',
+                        confirmButtonText: 'Tutup',
+                        confirmButtonColor: '#ef4444'
+                    });
+                    showToast('Pengiriman bertahap mengalami kendala', 'error');
+                }
+
+                return;
+            }
+
+            // 2. JIKA BATCH TUNGGAL NORMAL (TIDAK ADA KONTAINER DUPLIKAT)
+            try {
+                const viewerText = document.getElementById('json-viewer').value;
+                if (viewerText && viewerText.trim().startsWith('{')) {
+                    currentPayload = JSON.parse(viewerText);
+                }
+            } catch (e) {
+                console.warn('Memakai currentPayload dari memory:', e);
+            }
+
+            const swalSingle = await Swal.fire({
+                title: 'Konfirmasi Pengiriman',
+                html: `Kirim <strong>${currentPayload.kontainer.length} kontainer</strong> (${type === 'In' ? 'Gate-In' : 'Gate-Out'}) ke CEISA 4.0?<br><code style="font-size:12px; color:#38bdf8;">Ref: ${currentPayload.header.refNumber}</code>`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '🚀 Ya, Kirim ke CEISA',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#10b981',
+                cancelButtonColor: '#64748b',
+                reverseButtons: true
+            });
+
+            if (!swalSingle.isConfirmed) return;
 
             btnSend.disabled = true;
             spinner.style.display = 'inline-block';
             icon.style.display = 'none';
+
+            Swal.fire({
+                title: 'Mengirim ke CEISA 4.0...',
+                html: `Sedang mengirim <b>${currentPayload.kontainer.length} kontainer</b>...<br><span style="font-size:12px; font-family:monospace; color:#38bdf8;">Ref: ${currentPayload.header.refNumber}</span>`,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
 
             try {
                 showToast('Mengirim payload ke CEISA 4.0...', 'info');
@@ -1039,19 +1291,39 @@ $todayDate = date('Y-m-d');
                 const msgEl = document.getElementById('send-result-msg');
                 if (msgEl) {
                     msgEl.innerHTML = result.success
-                        ? `✅ <strong>Berhasil Terkirim:</strong> ${result.message || 'Data kontainer telah terkirim ke CEISA 4.0'}. Anda dapat memverifikasinya di menu <a href="report.php" style="color:var(--accent-green); text-decoration:underline;">Laporan Coarri Codeco</a>.`
+                        ? `✅ <strong>Berhasil Terkirim:</strong> ${result.message || 'Data kontainer telah terkirim ke CEISA 4.0'}. Anda dapat memverifikasinya di menu <a href="report_cont.php" style="color:var(--accent-green); text-decoration:underline;">Laporan Coarri Codeco</a>.`
                         : `❌ <strong>Gagal:</strong> ${result.message || 'Pengiriman ditolak oleh gateway CEISA 4.0'}`;
                 }
 
                 const rawEl = document.getElementById('send-raw-response');
                 if (rawEl) {
                     rawEl.textContent = JSON.stringify(result, null, 4);
-                    if (!result.success) rawEl.style.display = 'block';
+                    rawEl.style.display = 'block';
                 }
 
                 if (result.success) {
+                    Swal.fire({
+                        title: '🎉 Berhasil Terkirim!',
+                        text: result.message || 'Data kontainer berhasil terkirim ke CEISA 4.0.',
+                        icon: 'success',
+                        showCancelButton: true,
+                        confirmButtonText: '📊 Buka Laporan Coarri Codeco',
+                        cancelButtonText: 'Tutup',
+                        confirmButtonColor: '#10b981',
+                        cancelButtonColor: '#64748b'
+                    }).then((r) => {
+                        if (r.isConfirmed) {
+                            window.location.href = 'report_cont.php';
+                        }
+                    });
                     showToast('Pengiriman ke CEISA 4.0 berhasil!', 'success');
                 } else {
+                    Swal.fire({
+                        title: 'Pengiriman Gagal',
+                        text: result.message || 'Pengiriman ditolak oleh CEISA 4.0',
+                        icon: 'error',
+                        confirmButtonColor: '#ef4444'
+                    });
                     showToast('Pengiriman gagal: ' + (result.message || 'Periksa detail respon'), 'error');
                 }
 

@@ -5,7 +5,7 @@ $isCCTV = ($currentPage === 'cctv.php');
 $isPostData = ($currentPage === 'post_dokumen.php');
 $isCoCoCont = ($currentPage === 'cococont.php');
 $isCoCoKms = ($currentPage === 'cocokms.php');
-$isReportCont = ($currentPage === 'report.php');
+$isReportCont = ($currentPage === 'report_cont.php' || $currentPage === 'report.php');
 $isReportKms = ($currentPage === 'report_kms.php');
 if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
     $endpoints = getEndpointDefinitions();
@@ -70,7 +70,7 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
         <!-- Section Laporan -->
         <div class="nav-section-label" style="margin-top: 15px; padding: 0 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); font-weight: 600;">Laporan</div>
         <div class="nav-section">
-            <a href="report.php" class="nav-item <?= $isReportCont ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportCont ? 'cursor:default;' : '' ?>">
+            <a href="report_cont.php" class="nav-item <?= $isReportCont ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportCont ? 'cursor:default;' : '' ?>">
                 <span class="nav-icon">📊</span>
                 <span>Laporan Coarri Codeco (Container)</span>
                 <span class="nav-badge" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">Container</span>
