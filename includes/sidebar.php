@@ -6,9 +6,13 @@ $isPostData = ($currentPage === 'post_dokumen.php');
 $isCoCoCont = ($currentPage === 'cococont.php');
 $isCoCoKms = ($currentPage === 'cocokms.php');
 $isTpsTracking = ($currentPage === 'tps_tracking.php');
+$isTpsTrackingBatch = ($currentPage === 'tps_tracking_batch.php');
 $isReportCont = ($currentPage === 'report_cont.php' || $currentPage === 'report.php');
 $isReportKms = ($currentPage === 'report_kms.php');
 $isReportTracking = ($currentPage === 'report_tracking.php');
+$isReportTrackingBatch = ($currentPage === 'report_tracking_batch.php');
+$isLaporanYor = ($currentPage === 'laporan_yor.php');
+$isReportYor = ($currentPage === 'report_yor.php');
 if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
     $endpoints = getEndpointDefinitions();
 }
@@ -78,6 +82,24 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
             </a>
         </div>
 
+        <!-- TPS Tracking Batch CEISA 4.0 -->
+        <div class="nav-section">
+            <a href="tps_tracking_batch.php" class="nav-item <?= $isTpsTrackingBatch ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isTpsTrackingBatch ? 'cursor:default;' : '' ?>">
+                <span class="nav-icon">📦</span>
+                <span>TPS Tracking Batch</span>
+                <span class="nav-badge" style="background:rgba(245, 158, 11, 0.2); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);">BATCH</span>
+            </a>
+        </div>
+
+        <!-- Laporan YOR (Yard Occupancy Rate) CEISA 4.0 -->
+        <div class="nav-section">
+            <a href="laporan_yor.php" class="nav-item <?= $isLaporanYor ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isLaporanYor ? 'cursor:default;' : '' ?>">
+                <span class="nav-icon">📈</span>
+                <span>Laporan YOR (Yard Occupancy)</span>
+                <span class="nav-badge" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">YOR</span>
+            </a>
+        </div>
+
         <!-- Section Laporan -->
         <div class="nav-section-label" style="margin-top: 15px; padding: 0 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); font-weight: 600;">Laporan</div>
         <div class="nav-section">
@@ -99,6 +121,20 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                 <span class="nav-icon">📍</span>
                 <span>Laporan TPS Tracking (Kontainer)</span>
                 <span class="nav-badge" style="background:rgba(16, 185, 129, 0.2); color:#10b981; border:1px solid rgba(16,185,129,0.3);">Tracking</span>
+            </a>
+        </div>
+        <div class="nav-section">
+            <a href="report_tracking_batch.php" class="nav-item <?= $isReportTrackingBatch ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportTrackingBatch ? 'cursor:default;' : '' ?>">
+                <span class="nav-icon">📦</span>
+                <span>Laporan TPS Tracking Batch</span>
+                <span class="nav-badge" style="background:rgba(245, 158, 11, 0.2); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);">Batch</span>
+            </a>
+        </div>
+        <div class="nav-section">
+            <a href="report_yor.php" class="nav-item <?= $isReportYor ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportYor ? 'cursor:default;' : '' ?>">
+                <span class="nav-icon">📈</span>
+                <span>Laporan YOR Terkirim</span>
+                <span class="nav-badge" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">YOR</span>
             </a>
         </div>
 
