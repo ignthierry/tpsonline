@@ -5,8 +5,10 @@ $isCCTV = ($currentPage === 'cctv.php');
 $isPostData = ($currentPage === 'post_dokumen.php');
 $isCoCoCont = ($currentPage === 'cococont.php');
 $isCoCoKms = ($currentPage === 'cocokms.php');
+$isTpsTracking = ($currentPage === 'tps_tracking.php');
 $isReportCont = ($currentPage === 'report_cont.php' || $currentPage === 'report.php');
 $isReportKms = ($currentPage === 'report_kms.php');
+$isReportTracking = ($currentPage === 'report_tracking.php');
 if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
     $endpoints = getEndpointDefinitions();
 }
@@ -67,6 +69,15 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
             </a>
         </div>
 
+        <!-- TPS Tracking Kontainer CEISA 4.0 -->
+        <div class="nav-section">
+            <a href="tps_tracking.php" class="nav-item <?= $isTpsTracking ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isTpsTracking ? 'cursor:default;' : '' ?>">
+                <span class="nav-icon">📍</span>
+                <span>TPS Tracking Kontainer</span>
+                <span class="nav-badge" style="background:rgba(16, 185, 129, 0.2); color:#10b981; border:1px solid rgba(16,185,129,0.3);">BARU</span>
+            </a>
+        </div>
+
         <!-- Section Laporan -->
         <div class="nav-section-label" style="margin-top: 15px; padding: 0 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); font-weight: 600;">Laporan</div>
         <div class="nav-section">
@@ -81,6 +92,13 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                 <span class="nav-icon">📊</span>
                 <span>Laporan Coarri Codeco (Kemasan)</span>
                 <span class="nav-badge" style="background:rgba(139, 92, 246, 0.2); color:#a78bfa; border:1px solid rgba(139,92,246,0.3);">Kemasan</span>
+            </a>
+        </div>
+        <div class="nav-section">
+            <a href="report_tracking.php" class="nav-item <?= $isReportTracking ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportTracking ? 'cursor:default;' : '' ?>">
+                <span class="nav-icon">📍</span>
+                <span>Laporan TPS Tracking (Kontainer)</span>
+                <span class="nav-badge" style="background:rgba(16, 185, 129, 0.2); color:#10b981; border:1px solid rgba(16,185,129,0.3);">Tracking</span>
             </a>
         </div>
 
