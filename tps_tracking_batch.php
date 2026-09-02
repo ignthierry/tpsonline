@@ -777,14 +777,17 @@ $nowDmyHis = date('d-m-Y H:i:s');
                 return;
             }
 
-            // Cek jika tabel hanya punya 1 baris kosong, kita hapus dulu
+            // Hapus semua baris eksisting yang masih kosong (nomor kontainer belum diisi)
             const existingRows = document.querySelectorAll('#batch-tbody tr');
-            if (existingRows.length === 1) {
-                const firstCont = existingRows[0].querySelector('input[data-field="nomorKontainer"]').value.trim();
-                if (!firstCont) {
-                    document.getElementById('batch-tbody').innerHTML = '';
-                    rowCounter = 0;
+            existingRows.forEach(tr => {
+                const contInp = tr.querySelector('input[data-field="nomorKontainer"]');
+                if (!contInp || !contInp.value.trim()) {
+                    tr.remove();
                 }
+            });
+            // Jika setelah menghapus baris kosong tabel jadi kosong, reset counter
+            if (document.querySelectorAll('#batch-tbody tr').length === 0) {
+                rowCounter = 0;
             }
 
             let inserted = 0;

@@ -103,7 +103,7 @@ return [
     'app_name' => env('APP_NAME', 'CEISA 4.0 — TPS Online Dashboard'),
     'app_version' => '1.0.0',
     'timezone' => env('TIMEZONE', 'Asia/Jakarta'),
-    'auto_auth' => true, // Auto login via ENV (langsung ke dashboard)
+    'auto_auth' => false, // Memerlukan login pengguna aplikasi sebelum masuk ke dashboard
     
     // ===== cURL Settings =====
     'curl_timeout' => 45,        // timeout dalam detik

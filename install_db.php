@@ -12,6 +12,26 @@ if (!$pdo_tpsonline) {
 
 $tables = [
     // 1. Master Log Semua Return / Respon API
+    // 0. Tabel User Aplikasi Dashboard
+    'users' => "
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(50) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL,
+            nama_lengkap VARCHAR(100) NOT NULL,
+            email VARCHAR(100) NULL,
+            role VARCHAR(20) NOT NULL DEFAULT 'admin',
+            status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+            avatar VARCHAR(255) NULL,
+            remember_token VARCHAR(100) NULL,
+            terakhir_login DATETIME NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_username (username),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ",
+
     'ceisa_api_logs' => "
         CREATE TABLE IF NOT EXISTS ceisa_api_logs (
             id INT AUTO_INCREMENT PRIMARY KEY,

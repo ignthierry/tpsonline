@@ -166,4 +166,26 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
         </div>
         <?php endforeach; ?>
     </nav>
+
+    <!-- User Profile Footer in Sidebar -->
+    <div style="padding: 14px 16px; border-top: 1px solid var(--border-subtle); background: rgba(0,0,0,0.1);">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                <div class="user-avatar" style="width:34px; height:34px; font-size:0.8rem; flex-shrink:0; background: linear-gradient(135deg, #10b981, #059669); color:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:700;">
+                    <?= strtoupper(substr($_SESSION['nama_lengkap'] ?? $_SESSION['username'] ?? 'PS', 0, 2)) ?>
+                </div>
+                <div style="display: flex; flex-direction: column; overflow: hidden; line-height: 1.25;">
+                    <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; text-overflow: ellipsis; overflow: hidden;" title="<?= htmlspecialchars($_SESSION['nama_lengkap'] ?? 'User') ?>">
+                        <?= htmlspecialchars($_SESSION['nama_lengkap'] ?? $_SESSION['username'] ?? 'User') ?>
+                    </span>
+                    <span style="font-size: 0.72rem; color: #10b981; font-weight:600; text-transform: uppercase;">
+                        ● <?= htmlspecialchars($_SESSION['role'] ?? 'Admin') ?>
+                    </span>
+                </div>
+            </div>
+            <a href="logout.php" title="Keluar / Logout dari sistem" style="color: #ef4444; padding: 6px 9px; border-radius: 6px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.25); text-decoration: none; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
+                🚪
+            </a>
+        </div>
+    </div>
 </aside>
