@@ -163,7 +163,15 @@ if ($action === 'send') {
     try {
         $client = new CeisaClient();
         $endpoint = 'tps-tracking/batch';
-        $res = $client->post($endpoint, $cleanBatch);
+
+        // Bersihkan field khusus lokal (departemen) sebelum dikirim ke CEISA OpenAPI
+        $payloadForCeisa = array_map(function($item) {
+            $c = $item;
+            unset($c['departemen']);
+            return $c;
+        }, $cleanBatch);
+
+        $res = $client->post($endpoint, $payloadForCeisa);
 
         $isOk = ($res['code'] >= 200 && $res['code'] < 300);
         $batchId = 'BATCH-' . date('Ymd-His') . '-' . count($cleanBatch);
@@ -207,6 +215,7 @@ if ($action === 'send') {
                         }
 
                         $kegiatanLabel = getKegiatanLabel($itemClean['kodeKegiatan']);
+                        $deptTag = !empty($itemClean['departemen']) ? '[' . strtoupper(trim($itemClean['departemen'])) . '] ' : (!empty($postData['departemen']) ? '[' . strtoupper(trim($postData['departemen'])) . '] ' : '[TPP] ');
 
                         $stmtTrack->execute([
                             $itemClean['nomorKontainer'],
@@ -214,7 +223,7 @@ if ($action === 'send') {
                             $tglBlDb,
                             $kegiatanLabel,
                             $waktuDb,
-                            "[BATCH] Kegiatan {$itemClean['kodeKegiatan']}: {$kegiatanLabel}" . (!empty($itemClean['nomorPolisi']) ? " (Nopol: {$itemClean['nomorPolisi']})" : '') . " | {$batchId}",
+                            "[BATCH] {$deptTag}Kegiatan {$itemClean['kodeKegiatan']}: {$kegiatanLabel}" . (!empty($itemClean['nomorPolisi']) ? " (Nopol: {$itemClean['nomorPolisi']})" : '') . " | {$batchId}",
                             json_encode([
                                 'payload'  => $itemClean,
                                 'response' => $res['data'] ?? $res,
@@ -265,76 +274,177 @@ if ($action === 'send') {
 }
 
 // =========================================================================
-// ACTION 2: CARI KONTAINER UNTUK AUTO-FILL (REUSE DARI tps_tracking.php)
+// ACTION 2: CARI KONTAINER UNTUK AUTO-FILL (MULTI-DEPARTEMEN TPP & GUDANG)
 // =========================================================================
 if ($action === 'search_containers') {
     $q = strtoupper(trim(input('q', input('term', ''))));
+    $dept = strtolower(trim((string)input('dept', 'tpp')));
     $results = [];
 
     try {
-        global $pdo_tpp, $pdo_tpsonline;
+        global $pdo_tpp, $pdo_primamas, $pdo_tpsonline;
 
-        if ($pdo_tpp) {
-            if (strlen($q) >= 2) {
+        if ($dept === 'gudang') {
+            // PENCARIAN GUDANG LCL (DATABASE PRIMAMAS)
+            if ($pdo_primamas) {
+                $qClean = str_replace([' ', '-'], '', $q);
+                $whereClause = (strlen($q) >= 2) 
+                    ? "WHERE (REPLACE(REPLACE(k.No_Cont, '-', ''), ' ', '') LIKE :qClean OR k.No_Cont LIKE :q OR m.No_MasBL LIKE :q2)" 
+                    : "";
                 $sql = "
                     SELECT 
-                        idCont, noCont AS container_no, size AS size_type, status,
-                        location AS yard_block, row, slot, tier,
-                        COALESCE(NoPolIn, '') AS nopol,
-                        COALESCE(NO_MASTER_BL_AWB, '') AS no_bl,
-                        DATE_FORMAT(TGL_MASTER_BL_AWB, '%d-%m-%Y') AS tgl_bl,
-                        COALESCE(NoBC11, '') AS no_dokumen,
-                        DATE_FORMAT(tglBC11, '%d-%m-%Y') AS tgl_dokumen,
-                        DATE_FORMAT(tglInDepo, '%d-%m-%Y %H:%i:%s') AS waktu_masuk,
-                        COALESCE(shipper, '') AS shipper
-                    FROM tppcontplp
-                    WHERE noCont LIKE :q
-                    ORDER BY idCont DESC
+                        m.Id_MasBL,
+                        REPLACE(REPLACE(k.No_Cont, '-', ''), ' ', '') AS container_no,
+                        k.No_Cont AS raw_container_no,
+                        k.Size AS size_type,
+                        COALESCE(k.Type, 'LCL') AS status,
+                        man.blok AS yard_block,
+                        '' AS row,
+                        '' AS slot,
+                        '' AS tier,
+                        COALESCE(m.nopol_in, m.nopol_out, '') AS nopol,
+                        COALESCE(m.No_MasBL, '') AS no_bl,
+                        DATE_FORMAT(m.Tgl_MasBL, '%d-%m-%Y') AS tgl_bl,
+                        COALESCE(H.NO_BC11, '') AS no_dokumen,
+                        DATE_FORMAT(H.TGL_BC11, '%d-%m-%Y') AS tgl_dokumen,
+                        COALESCE(H.NO_PLP, '') AS no_plp,
+                        DATE_FORMAT(H.TGL_PLP, '%d-%m-%Y') AS tgl_plp,
+                        DATE_FORMAT(CONCAT(m.tgl_datang_cont, ' ', IFNULL(m.jam_datang_cont, '00:00:00')), '%d-%m-%Y %H:%i:%s') AS waktu_masuk,
+                        DATE_FORMAT(CONCAT(man.Tgl_StrippingBC, ' ', IFNULL(man.jamStrippingBC, '00:00:00')), '%d-%m-%Y %H:%i:%s') AS waktu_stripping,
+                        DATE_FORMAT(CONCAT(m.tgl_keluar_cont, ' ', IFNULL(m.jam_keluar_cont, '00:00:00')), '%d-%m-%Y %H:%i:%s') AS waktu_keluar,
+                        COALESCE(m.No_SegelBC, '') AS no_segel,
+                        'GUDANG' AS departemen
+                    FROM master_bl m
+                    INNER JOIN kontainer k ON m.Id_Kontainer_FK = k.Id_Kontainer
+                    LEFT JOIN manifest man ON man.Id_MasBL_FK = m.Id_MasBL
+                    LEFT JOIN tpsws_responplp_detail_backup D ON D.NO_BL_AWB = man.No_BL
+                    LEFT JOIN tpsws_responplp_header_backup H ON H.NO_SURAT = D.NO_SURAT_FK AND H.NO_PLP = D.NO_PLP_FK
+                    {$whereClause}
+                    GROUP BY m.Id_MasBL
+                    ORDER BY m.Id_MasBL DESC
                     LIMIT 50
                 ";
-                $stmt = $pdo_tpp->prepare($sql);
-                $stmt->execute([':q' => "%$q%"]);
+                $stmt = $pdo_primamas->prepare($sql);
+                if (strlen($q) >= 2) {
+                    $stmt->execute([':qClean' => "%$qClean%", ':q' => "%$q%", ':q2' => "%$q%"]);
+                } else {
+                    $stmt->execute();
+                }
                 $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            } else {
-                $sql = "
-                    SELECT 
-                        idCont, noCont AS container_no, size AS size_type, status,
-                        location AS yard_block, row, slot, tier,
-                        COALESCE(NoPolIn, '') AS nopol,
-                        COALESCE(NO_MASTER_BL_AWB, '') AS no_bl,
-                        DATE_FORMAT(TGL_MASTER_BL_AWB, '%d-%m-%Y') AS tgl_bl,
-                        COALESCE(NoBC11, '') AS no_dokumen,
-                        DATE_FORMAT(tglBC11, '%d-%m-%Y') AS tgl_dokumen,
-                        DATE_FORMAT(tglInDepo, '%d-%m-%Y %H:%i:%s') AS waktu_masuk,
-                        COALESCE(shipper, '') AS shipper
-                    FROM tppcontplp
-                    ORDER BY idCont DESC
-                    LIMIT 30
-                ";
-                $stmt = $pdo_tpp->query($sql);
-                $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } else {
+            // PENCARIAN TPP PLP (DATABASE TPP_PRIMAMAS)
+            if ($pdo_tpp) {
+                if (strlen($q) >= 2) {
+                    $sql = "
+                        SELECT 
+                            idCont, noCont AS container_no, size AS size_type, status,
+                            location AS yard_block, row, slot, tier,
+                            COALESCE(NoPolIn, '') AS nopol,
+                            COALESCE(NO_MASTER_BL_AWB, '') AS no_bl,
+                            DATE_FORMAT(TGL_MASTER_BL_AWB, '%d-%m-%Y') AS tgl_bl,
+                            COALESCE(NoBC11, '') AS no_dokumen,
+                            DATE_FORMAT(tglBC11, '%d-%m-%Y') AS tgl_dokumen,
+                            DATE_FORMAT(tglInDepo, '%d-%m-%Y %H:%i:%s') AS waktu_masuk,
+                            '' AS waktu_stripping,
+                            DATE_FORMAT(tglOUT_truckingKosong, '%d-%m-%Y %H:%i:%s') AS waktu_keluar,
+                            COALESCE(shipper, '') AS shipper,
+                            'TPP' AS departemen
+                        FROM tppcontplp
+                        WHERE noCont LIKE :q
+                        ORDER BY idCont DESC
+                        LIMIT 50
+                    ";
+                    $stmt = $pdo_tpp->prepare($sql);
+                    $stmt->execute([':q' => "%$q%"]);
+                    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                } else {
+                    $sql = "
+                        SELECT 
+                            idCont, noCont AS container_no, size AS size_type, status,
+                            location AS yard_block, row, slot, tier,
+                            COALESCE(NoPolIn, '') AS nopol,
+                            COALESCE(NO_MASTER_BL_AWB, '') AS no_bl,
+                            DATE_FORMAT(TGL_MASTER_BL_AWB, '%d-%m-%Y') AS tgl_bl,
+                            COALESCE(NoBC11, '') AS no_dokumen,
+                            DATE_FORMAT(tglBC11, '%d-%m-%Y') AS tgl_dokumen,
+                            DATE_FORMAT(tglInDepo, '%d-%m-%Y %H:%i:%s') AS waktu_masuk,
+                            '' AS waktu_stripping,
+                            DATE_FORMAT(tglOUT_truckingKosong, '%d-%m-%Y %H:%i:%s') AS waktu_keluar,
+                            COALESCE(shipper, '') AS shipper,
+                            'TPP' AS departemen
+                        FROM tppcontplp
+                        ORDER BY idCont DESC
+                        LIMIT 30
+                    ";
+                    $stmt = $pdo_tpp->query($sql);
+                    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                }
             }
         }
     } catch (Exception $e) {
         error_log("Error search containers batch: " . $e->getMessage());
     }
 
+    // Pengecekan status pernah terkirim dari ceisa_tracking
+    $alreadySentMap = [];
+    if (!empty($results) && !empty($pdo_tpsonline)) {
+        try {
+            $contList = [];
+            foreach ($results as $r) {
+                $c = strtoupper(str_replace([' ', '-'], '', (string)$r['container_no']));
+                if ($c) $contList[] = $c;
+            }
+            $contList = array_unique($contList);
+            if (!empty($contList)) {
+                $placeholders = implode(',', array_fill(0, count($contList), '?'));
+                $stmtTrack = $pdo_tpsonline->prepare("
+                    SELECT no_cont, status_tracking, waktu_status 
+                    FROM ceisa_tracking 
+                    WHERE no_cont IN ($placeholders)
+                    ORDER BY id DESC
+                ");
+                $stmtTrack->execute(array_values($contList));
+                foreach ($stmtTrack->fetchAll(PDO::FETCH_ASSOC) as $tr) {
+                    if (!isset($alreadySentMap[$tr['no_cont']])) {
+                        $alreadySentMap[$tr['no_cont']] = $tr;
+                    }
+                }
+            }
+        } catch (Exception $e2) {
+            error_log("Error check already sent batch: " . $e2->getMessage());
+        }
+    }
+
     // Format
     $formatted = [];
     foreach ($results as $r) {
+        $cleanCont = strtoupper(str_replace([' ', '-'], '', (string)$r['container_no']));
+        $already = $alreadySentMap[$cleanCont] ?? null;
+        $isSent = !empty($already);
+
         $formatted[] = [
-            'container_no' => $r['container_no'],
-            'size_type'    => $r['size_type'] ?: '40',
-            'size'         => (strpos($r['size_type'] ?: '', '20') !== false ? '20' : (strpos($r['size_type'] ?: '', '45') !== false ? '45' : '40')),
-            'status'       => $r['status'] ?: 'FCL',
-            'yard_block'   => $r['yard_block'] ?: '',
-            'slot'         => $r['slot'] ?: '',
-            'tier'         => $r['tier'] ?: '',
-            'nopol'        => $r['nopol'] ?: '',
-            'no_bl'        => $r['no_bl'] ?: '',
-            'tgl_bl'       => $r['tgl_bl'] ?: '',
-            'no_dokumen'   => $r['no_dokumen'] ?: '',
-            'tgl_dokumen'  => $r['tgl_dokumen'] ?: ''
+            'container_no'    => $cleanCont,
+            'raw_container_no'=> $r['raw_container_no'] ?? $r['container_no'],
+            'size_type'       => $r['size_type'] ?: '40',
+            'size'            => (strpos($r['size_type'] ?: '', '20') !== false ? '20' : (strpos($r['size_type'] ?: '', '45') !== false ? '45' : '40')),
+            'status'          => $r['status'] ?: ($dept === 'gudang' ? 'LCL' : 'FCL'),
+            'departemen'      => $r['departemen'] ?? strtoupper($dept),
+            'yard_block'      => $r['yard_block'] ?: '',
+            'slot'            => $r['slot'] ?: '',
+            'tier'            => $r['tier'] ?: '',
+            'nopol'           => $r['nopol'] ?: '',
+            'no_bl'           => $r['no_bl'] ?: '',
+            'tgl_bl'          => $r['tgl_bl'] ?: '',
+            'no_dokumen'      => $r['no_dokumen'] ?: ($r['no_plp'] ?? ''),
+            'tgl_dokumen'     => $r['tgl_dokumen'] ?: ($r['tgl_plp'] ?? ''),
+            'waktu_masuk'     => $r['waktu_masuk'] ?: '',
+            'waktu_stripping' => $r['waktu_stripping'] ?: '',
+            'waktu_keluar'    => $r['waktu_keluar'] ?: '',
+            'no_segel'        => $r['no_segel'] ?? '',
+            'already_sent'        => $isSent,
+            'last_tracked_waktu'  => $already ? $already['waktu_status'] : '',
+            'last_tracked_status' => $already ? $already['status_tracking'] : ''
         ];
     }
 

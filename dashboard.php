@@ -104,7 +104,7 @@ $userInitial = strtoupper(substr($username, 0, 2));
     <div class="toast-container" id="toast-container"></div>
 
     <!-- App Script -->
-    <script src="assets/js/app.js"></script>
+    <script src="assets/js/app.js?v=<?= time() ?>"></script>
     <script>
         async function refreshAccessToken() {
             try {

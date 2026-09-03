@@ -192,6 +192,64 @@ $nowDmyHis = date('d-m-Y H:i:s');
             color: #ffffff;
             box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
         }
+        .dept-toggle-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-medium);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+        }
+        .dept-toggle-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .dept-toggle-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: var(--bg-input);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--border-medium);
+            gap: 6px;
+        }
+        .dept-btn {
+            height: 40px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.88rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .dept-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .dept-btn.active.dept-tpp {
+            background: var(--accent-blue);
+            color: #ffffff;
+            font-weight: 700;
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.35);
+        }
+        .dept-btn.active.dept-gudang {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #ffffff;
+            font-weight: 700;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.35);
+        }
         .tabs-nav {
             display: flex;
             gap: 8px;
@@ -483,11 +541,30 @@ $nowDmyHis = date('d-m-Y H:i:s');
                                             <span>📦</span> 1. Identitas Kontainer & Lokasi TPS
                                         </div>
 
+                                        <!-- Pemilihan Departemen Operasional -->
+                                        <div class="dept-toggle-card">
+                                            <div class="dept-toggle-label">
+                                                <span>🏢 Departemen Operasional Lini 2</span>
+                                                <span id="dept-database-badge" style="font-size:0.72rem; text-transform:none; padding:2px 8px; border-radius:6px; background:rgba(59,130,246,0.15); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">
+                                                    DB: tpp_primamas (PLP FCL)
+                                                </span>
+                                            </div>
+                                            <div class="dept-toggle-group">
+                                                <button type="button" class="dept-btn active dept-tpp" id="btn-dept-tpp" onclick="setDepartment('tpp')">
+                                                    <span>🏢</span> TPP (PLP / Lapangan)
+                                                </button>
+                                                <button type="button" class="dept-btn" id="btn-dept-gudang" onclick="setDepartment('gudang')">
+                                                    <span>🏬</span> Gudang (LCL / Stripping)
+                                                </button>
+                                            </div>
+                                            <input type="hidden" id="departemen-val" value="tpp">
+                                        </div>
+
                                         <div style="display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; margin-bottom: 14px;">
                                             <div class="field-group">
                                                 <div class="label-header">
                                                     <label for="no-cont">Nomor Kontainer <span class="req-star">*</span></label>
-                                                    <span style="font-size:0.75rem; color:var(--accent-blue); font-weight:500;">⚡ Auto-Fill tpp_primamas</span>
+                                                    <span id="dept-hint-badge" style="font-size:0.75rem; color:var(--accent-blue); font-weight:600;">⚡ Auto-Fill tpp_primamas</span>
                                                 </div>
                                                 <select id="no-cont" style="width: 100%;" required>
                                                     <option value=""></option>
@@ -534,39 +611,37 @@ $nowDmyHis = date('d-m-Y H:i:s');
                                         <div class="field-group" style="margin-bottom: 14px;">
                                             <label for="kode-kegiatan">Kode Kegiatan CEISA 4.0 <span class="req-star">*</span></label>
                                             <select id="kode-kegiatan" class="input-control" style="font-weight: 500;" onchange="onKegiatanChange(this.value); updateJsonPreview();" required>
-                                                <optgroup label="📍 Alur IMPOR2 (TPS Lini 2 / Depo & Gudang Penyangga)">
-                                                    <option value="5" selected>5 — GATE IN PLP</option>
-                                                    <option value="6">6 — GATE OUT LINI 2</option>
-                                                    <option value="17">17 — STACKING DISCHARGE LINI 2 (Posisi Yard Wajib)</option>
-                                                    <option value="19">19 — TRUCK IN LINI 2</option>
-                                                    <option value="20">20 — PICKUP LINI 2</option>
-                                                    <option value="21">21 — BEHANDLE LINI 2 (Posisi Yard Wajib)</option>
-                                                    <option value="22">22 — SHIFTING LINI 2 (Posisi Yard Wajib)</option>
-                                                    <option value="23">23 — STRIPPING STUFFING LINI 2</option>
-                                                </optgroup>
-                                                <optgroup label="📍 Alur EKSPOR2 (TPS Lini 2 / Depo & Gudang Penyangga)">
-                                                    <option value="7">7 — GATE IN EKSPOR LINI 2</option>
-                                                    <option value="8">8 — GATE OUT EKSPOR LINI 2</option>
-                                                    <option value="18">18 — STACKING EKSPOR LINI 2 (Posisi Yard Wajib)</option>
-                                                    <option value="24">24 — STUFFING KE GUDANG LINI 2 (Posisi Yard Wajib)</option>
-                                                </optgroup>
-                                                <optgroup label="⚓ Alur IMPOR1 (TPS Lini 1 / Dermaga Pelabuhan)">
-                                                    <option value="1">1 — DISCHARGE</option>
-                                                    <option value="3">3 — GATE OUT (Codeco Impor)</option>
-                                                    <option value="10">10 — STACKING DISCHARGE (Posisi Yard Wajib)</option>
-                                                    <option value="12">12 — TRUCK IN</option>
-                                                    <option value="13">13 — PICKUP</option>
-                                                    <option value="14">14 — BEHANDLE (Posisi Yard Wajib)</option>
-                                                    <option value="15">15 — SHIFTING (Posisi Yard Wajib)</option>
-                                                    <option value="16">16 — STRIPPING STUFFING</option>
-                                                </optgroup>
-                                                <optgroup label="⚓ Alur EKSPOR1 (TPS Lini 1 / Dermaga Pelabuhan)">
-                                                    <option value="2">2 — LOADING</option>
-                                                    <option value="4">4 — GATE IN RECEIVING (Codeco Ekspor)</option>
-                                                    <option value="9">9 — GATE OUT BATAL EKSPOR</option>
-                                                    <option value="11">11 — STACKING EKSPOR (Posisi Yard Wajib)</option>
-                                                </optgroup>
-                                            </select>
+                                                 <optgroup label="🏢 Kegiatan Utama TPP (PLP / Lapangan Penumpukan FCL)">
+                                                     <option value="5" selected>5 — GATE IN PLP (Pemasukan Kontainer FCL)</option>
+                                                     <option value="17">17 — STACKING DISCHARGE LINI 2 (Posisi Yard Wajib)</option>
+                                                     <option value="21">21 — BEHANDLE LINI 2 (Pemeriksaan Fisik Behandle Yard)</option>
+                                                     <option value="22">22 — SHIFTING LINI 2 (Pergeseran Posisi Yard)</option>
+                                                     <option value="20">20 — PICKUP LINI 2 (Pengangkatan Kontainer ke Truk)</option>
+                                                     <option value="6">6 — GATE OUT LINI 2 (Pengeluaran Kontainer FCL Lini 2)</option>
+                                                 </optgroup>
+                                                 <optgroup label="🚢 Alur Ekspor Lini 2">
+                                                     <option value="7">7 — GATE IN EKSPOR LINI 2</option>
+                                                     <option value="18">18 — STACKING EKSPOR LINI 2 (Posisi Yard Wajib)</option>
+                                                     <option value="8">8 — GATE OUT EKSPOR LINI 2</option>
+                                                 </optgroup>
+                                                 <optgroup label="⚓ Kegiatan Lainnya (Gudang & Dermaga Lini 1)">
+                                                     <option value="23">23 — STRIPPING STUFFING LINI 2</option>
+                                                     <option value="24">24 — STUFFING KE GUDANG LINI 2 (Posisi Yard Wajib)</option>
+                                                     <option value="19">19 — TRUCK IN LINI 2</option>
+                                                     <option value="1">1 — DISCHARGE</option>
+                                                     <option value="2">2 — LOADING</option>
+                                                     <option value="3">3 — GATE OUT (Codeco Impor Lini 1)</option>
+                                                     <option value="4">4 — GATE IN RECEIVING (Codeco Ekspor)</option>
+                                                     <option value="9">9 — GATE OUT BATAL EKSPOR</option>
+                                                     <option value="10">10 — STACKING DISCHARGE Lini 1</option>
+                                                     <option value="11">11 — STACKING EKSPOR Lini 1</option>
+                                                     <option value="12">12 — TRUCK IN</option>
+                                                     <option value="13">13 — PICKUP</option>
+                                                     <option value="14">14 — BEHANDLE Lini 1</option>
+                                                     <option value="15">15 — SHIFTING Lini 1</option>
+                                                     <option value="16">16 — STRIPPING STUFFING Lini 1</option>
+                                                 </optgroup>
+                                             </select>
                                         </div>
 
                                         <div class="field-group">
@@ -623,28 +698,37 @@ $nowDmyHis = date('d-m-Y H:i:s');
                                                 <select id="kode-dok" class="input-control" onchange="updateJsonPreview()">
                                                     <option value="">-- Tanpa Dokumen / Sesuai Fisik --</option>
                                                     
-                                                    <optgroup label="📥 Dokumen Pemasukan PLP & Kedatangan (Gate In PLP)">
+                                                    <optgroup label="🏢 Khusus TPP (PLP / Lapangan FCL)">
                                                         <option value="3" selected>3 — Persetujuan PLP (Surat Pindah Lokasi Penimbunan)</option>
-                                                        <option value="11">11 — MANIFES (BC 1.1)</option>
-                                                        <option value="20">20 — BC 1.1 (Manifes Pos/Subpos)</option>
                                                     </optgroup>
 
-                                                    <optgroup label="📤 Dokumen Pengeluaran / SPPB (Gate Out Lini 2)">
-                                                        <option value="1">1 — SPPB PIB (BC 2.0 - Impor Umum)</option>
-                                                        <option value="2">2 — SPPB BC 2.3 (Impor Kawasan Berikat)</option>
-                                                        <option value="28">28 — SPPB BC 2.8 (Impor dari PLB)</option>
-                                                        <option value="21">21 — PIBK (Impor Khusus)</option>
-                                                        <option value="6">6 — SPPB BC 4.1 (Pengeluaran TPB ke Lokal)</option>
-                                                        <option value="4">4 — SPPB PIB SPTNP</option>
+                                                    <optgroup label="🏬 Khusus Gudang (LCL / CFS Warehouse)">
+                                                        <option value="704">704 — MASTER B/L (Master Bill of Lading)</option>
+                                                        <option value="705">705 — B/L (House Bill of Lading)</option>
+                                                        <option value="640">640 — Delivery Order (D/O)</option>
+                                                        <option value="65">65 — BC 1.1 Konsolidasi PJT</option>
+                                                    </optgroup>
+
+                                                    <optgroup label="📋 Dokumen Manifes & Kedatangan (Bersama)">
+                                                        <option value="11">11 — MANIFES (BC 1.1 Inward Manifest)</option>
+                                                        <option value="10">10 — RKSP (Rencana Kedatangan Sarana Pengangkut)</option>
+                                                    </optgroup>
+
+                                                    <optgroup label="📥 Dokumen Pabean Impor & Pengeluaran SPPB (Bersama)">
+                                                        <option value="20">20 — BC 2.0 (PIB - Pemberitahuan Impor Barang)</option>
+                                                        <option value="23">23 — BC 2.3 (Impor Tempat Penimbunan Berikat / TPB)</option>
+                                                        <option value="21">21 — PIBK (Pemberitahuan Impor Barang Khusus)</option>
+                                                        <option value="16">16 — BC 1.6 (Pengeluaran Kawasan Pabean ke PLB)</option>
+                                                        <option value="28">28 — BC 2.8 (Impor dari Pusat Logistik Berikat)</option>
+                                                        <option value="25">25 — BC 2.5 (Pengeluaran dari TPB ke TLDDP)</option>
+                                                        <option value="27">27 — BC 2.7 (Pengeluaran Antar TPB)</option>
+                                                        <option value="40">40 — BC 4.0 (Pemasukan TLDDP ke TPB)</option>
+                                                        <option value="41">41 — BC 4.1 (Pengeluaran Kembali ke TLDDP)</option>
                                                     </optgroup>
 
                                                     <optgroup label="🚢 Dokumen Ekspor">
-                                                        <option value="30">30 — BC 3.0 (PEB - Ekspor)</option>
-                                                    </optgroup>
-
-                                                    <optgroup label="📑 Dokumen Pengangkutan">
-                                                        <option value="705">705 — B/L (Bill of Lading)</option>
-                                                        <option value="640">640 — Delivery Order (D/O)</option>
+                                                        <option value="30">30 — BC 3.0 (PEB - Pemberitahuan Ekspor Barang)</option>
+                                                        <option value="33">33 — BC 3.3 (Ekspor melalui PLB)</option>
                                                     </optgroup>
                                                 </select>
                                             </div>
@@ -730,6 +814,123 @@ $nowDmyHis = date('d-m-Y H:i:s');
         let currentPayload = {};
         let searchTimeout = null;
         let historyTableInstance = null;
+        let currentDept = 'tpp';
+        window.selectedContainerData = null;
+
+        function renderKegiatanOptions(dept) {
+            const selectEl = document.getElementById('kode-kegiatan');
+            if (!selectEl) return;
+            const currentVal = selectEl.value;
+
+            if (dept === 'gudang') {
+                selectEl.innerHTML = `
+                    <optgroup label="🏬 Kegiatan Utama Gudang (LCL / CFS Warehouse)">
+                        <option value="5" ${currentVal==='5'?'selected':''}>5 — GATE IN PLP (Pemasukan Kontainer LCL)</option>
+                        <option value="23" ${currentVal==='23' || !currentVal || currentVal==='17'?'selected':''}>23 — STRIPPING STUFFING LINI 2 (Pembongkaran Kargo LCL)</option>
+                        <option value="21" ${currentVal==='21'?'selected':''}>21 — BEHANDLE LINI 2 (Pemeriksaan Fisik Kargo / Gudang)</option>
+                        <option value="6" ${currentVal==='6'?'selected':''}>6 — GATE OUT LINI 2 (Kontainer Kosong / Empty Return)</option>
+                        <option value="24" ${currentVal==='24'?'selected':''}>24 — STUFFING KE GUDANG LINI 2 (Pemuatan Kargo Ekspor)</option>
+                    </optgroup>
+                    <optgroup label="🚢 Alur Ekspor Lini 2">
+                        <option value="7" ${currentVal==='7'?'selected':''}>7 — GATE IN EKSPOR LINI 2</option>
+                        <option value="18" ${currentVal==='18'?'selected':''}>18 — STACKING EKSPOR LINI 2 (Posisi Yard Wajib)</option>
+                        <option value="8" ${currentVal==='8'?'selected':''}>8 — GATE OUT EKSPOR LINI 2</option>
+                    </optgroup>
+                    <optgroup label="⚓ Kegiatan Lainnya (Lini 1 / Lapangan TPP)">
+                        <option value="17">17 — STACKING DISCHARGE LINI 2 (Posisi Yard Wajib)</option>
+                        <option value="19">19 — TRUCK IN LINI 2</option>
+                        <option value="20">20 — PICKUP LINI 2</option>
+                        <option value="22">22 — SHIFTING LINI 2 (Posisi Yard Wajib)</option>
+                        <option value="1">1 — DISCHARGE</option>
+                        <option value="2">2 — LOADING</option>
+                        <option value="3">3 — GATE OUT (Codeco Impor Lini 1)</option>
+                        <option value="4">4 — GATE IN RECEIVING (Codeco Ekspor)</option>
+                        <option value="9">9 — GATE OUT BATAL EKSPOR</option>
+                        <option value="10">10 — STACKING DISCHARGE Lini 1</option>
+                        <option value="11">11 — STACKING EKSPOR Lini 1</option>
+                        <option value="12">12 — TRUCK IN</option>
+                        <option value="13">13 — PICKUP</option>
+                        <option value="14">14 — BEHANDLE Lini 1</option>
+                        <option value="15">15 — SHIFTING Lini 1</option>
+                        <option value="16">16 — STRIPPING STUFFING Lini 1</option>
+                    </optgroup>
+                `;
+            } else {
+                selectEl.innerHTML = `
+                    <optgroup label="🏢 Kegiatan Utama TPP (PLP / Lapangan Penumpukan FCL)">
+                        <option value="5" ${currentVal==='5' || !currentVal || currentVal==='23'?'selected':''}>5 — GATE IN PLP (Pemasukan Kontainer FCL)</option>
+                        <option value="17" ${currentVal==='17'?'selected':''}>17 — STACKING DISCHARGE LINI 2 (Posisi Yard Wajib)</option>
+                        <option value="21" ${currentVal==='21'?'selected':''}>21 — BEHANDLE LINI 2 (Pemeriksaan Fisik Behandle Yard)</option>
+                        <option value="22" ${currentVal==='22'?'selected':''}>22 — SHIFTING LINI 2 (Pergeseran Posisi Yard)</option>
+                        <option value="20" ${currentVal==='20'?'selected':''}>20 — PICKUP LINI 2 (Pengangkatan Kontainer ke Truk)</option>
+                        <option value="6" ${currentVal==='6'?'selected':''}>6 — GATE OUT LINI 2 (Pengeluaran Kontainer FCL Lini 2)</option>
+                    </optgroup>
+                    <optgroup label="🚢 Alur Ekspor Lini 2">
+                        <option value="7" ${currentVal==='7'?'selected':''}>7 — GATE IN EKSPOR LINI 2</option>
+                        <option value="18" ${currentVal==='18'?'selected':''}>18 — STACKING EKSPOR LINI 2 (Posisi Yard Wajib)</option>
+                        <option value="8" ${currentVal==='8'?'selected':''}>8 — GATE OUT EKSPOR LINI 2</option>
+                    </optgroup>
+                    <optgroup label="⚓ Kegiatan Lainnya (Gudang & Dermaga Lini 1)">
+                        <option value="23">23 — STRIPPING STUFFING LINI 2</option>
+                        <option value="24">24 — STUFFING KE GUDANG LINI 2 (Posisi Yard Wajib)</option>
+                        <option value="19">19 — TRUCK IN LINI 2</option>
+                        <option value="1">1 — DISCHARGE</option>
+                        <option value="2">2 — LOADING</option>
+                        <option value="3">3 — GATE OUT (Codeco Impor Lini 1)</option>
+                        <option value="4">4 — GATE IN RECEIVING (Codeco Ekspor)</option>
+                        <option value="9">9 — GATE OUT BATAL EKSPOR</option>
+                        <option value="10">10 — STACKING DISCHARGE Lini 1</option>
+                        <option value="11">11 — STACKING EKSPOR Lini 1</option>
+                        <option value="12">12 — TRUCK IN</option>
+                        <option value="13">13 — PICKUP</option>
+                        <option value="14">14 — BEHANDLE Lini 1</option>
+                        <option value="15">15 — SHIFTING Lini 1</option>
+                        <option value="16">16 — STRIPPING STUFFING Lini 1</option>
+                    </optgroup>
+                `;
+            }
+        }
+
+        function setDepartment(dept) {
+            currentDept = dept;
+            $('#departemen-val').val(dept);
+
+            renderKegiatanOptions(dept);
+
+            if (dept === 'gudang') {
+                $('#btn-dept-gudang').addClass('active dept-gudang');
+                $('#btn-dept-tpp').removeClass('active dept-tpp');
+                $('#dept-hint-badge').html('⚡ Auto-Fill primamas (Gudang LCL)').css('color', '#10b981');
+                $('#dept-database-badge').html('DB: primamas (Gudang LCL)').css({
+                    'background': 'rgba(16, 185, 129, 0.15)',
+                    'color': '#10b981',
+                    'border-color': 'rgba(16, 185, 129, 0.3)'
+                });
+                $('#kode-gudang').val('GPSU');
+                $('#jenis-cont').val('7'); // 7 = LCL
+                $('#kode-dok').val('704'); // 704 = MASTER B/L (Standar LCL)
+                
+                showToast('Departemen Gudang (LCL / database primamas) aktif — Dokumen default: 704 (MASTER B/L)', 'info');
+            } else {
+                $('#btn-dept-tpp').addClass('active dept-tpp');
+                $('#btn-dept-gudang').removeClass('active dept-gudang');
+                $('#dept-hint-badge').html('⚡ Auto-Fill tpp_primamas (TPP PLP)').css('color', 'var(--accent-blue)');
+                $('#dept-database-badge').html('DB: tpp_primamas (PLP FCL)').css({
+                    'background': 'rgba(59, 130, 246, 0.15)',
+                    'color': 'var(--accent-blue)',
+                    'border-color': 'rgba(59, 130, 246, 0.3)'
+                });
+                $('#kode-gudang').val('CPSU');
+                $('#jenis-cont').val('8'); // 8 = FCL
+                $('#kode-dok').val('3'); // 3 = Persetujuan PLP (Standar PLP FCL)
+                showToast('Departemen TPP (PLP / database tpp_primamas) aktif — Dokumen default: 3 (Persetujuan PLP)', 'info');
+            }
+
+            // Reset kontainer yang terpilih agar operator mencari di database yang aktif
+            window.selectedContainerData = null;
+            $('#no-cont').val(null).trigger('change');
+            updateJsonPreview();
+        }
 
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
@@ -808,6 +1009,32 @@ $nowDmyHis = date('d-m-Y H:i:s');
             showToast('Waktu kegiatan diset ke waktu sekarang', 'info');
         }
 
+        function applySmartTimestamp(item) {
+            item = item || window.selectedContainerData;
+            if (!item) return;
+
+            const kdKeg = $('#kode-kegiatan').val();
+            // 5 = Gate In PLP
+            if (kdKeg === '5' && item.waktu_masuk) {
+                $('#waktu-kegiatan').val(item.waktu_masuk);
+            } 
+            // 16 / 23 = Stripping Stuffing
+            else if ((kdKeg === '16' || kdKeg === '23') && item.waktu_stripping) {
+                $('#waktu-kegiatan').val(item.waktu_stripping);
+            } 
+            // 6 = Gate Out Lini 2
+            else if (kdKeg === '6' && item.waktu_keluar) {
+                $('#waktu-kegiatan').val(item.waktu_keluar);
+                if (item.departemen === 'GUDANG') {
+                    $('#jenis-cont').val('4'); // Gate Out Gudang kontainer kosong (EMPTY)
+                }
+            } 
+            // Fallback ke waktu_masuk jika ada
+            else if (item.waktu_masuk && !$('#waktu-kegiatan').val()) {
+                $('#waktu-kegiatan').val(item.waktu_masuk);
+            }
+        }
+
         function onKegiatanChange(val) {
             // Bab 8.2: Kosongkan posisi jika kegiatan keluar/loading (Kosongkan Posisi = Ya)
             const kosongkanPosisi = ['2', '3', '6', '8', '9', '13', '20'];
@@ -817,22 +1044,40 @@ $nowDmyHis = date('d-m-Y H:i:s');
                 $('#tier-loc').val('');
             }
 
-            // Set otomatis dokumen berdasarkan alur kegiatan PLP
+            // Set otomatis dokumen berdasarkan alur kegiatan & departemen
             if (val === '5') {
-                // Gate In PLP -> Default dokumen Persetujuan PLP (3)
-                if (!$('#kode-dok').val()) {
+                // Gate In PLP -> TPP: 3 (Persetujuan PLP), Gudang: 704 (Master B/L) atau 11 (Manifes)
+                if (currentDept === 'gudang') {
+                    $('#kode-dok').val('704');
+                } else {
                     $('#kode-dok').val('3');
                 }
+            } else if (val === '23') {
+                // 23 = Stripping Stuffing Lini 2 -> Khusus Gudang LCL
+                if (currentDept === 'gudang') {
+                    if (!$('#kode-dok').val() || $('#kode-dok').val() === '3') {
+                        $('#kode-dok').val('704');
+                    }
+                }
             } else if (val === '6') {
-                // Gate Out Lini 2 -> Default dokumen SPPB PIB (1)
-                if (!$('#kode-dok').val() || $('#kode-dok').val() === '3') {
-                    $('#kode-dok').val('1');
+                // Gate Out Lini 2
+                if (currentDept === 'gudang') {
+                    $('#jenis-cont').val('4'); // Empty container
+                } else {
+                    if (!$('#kode-dok').val() || $('#kode-dok').val() === '3') {
+                        $('#kode-dok').val('20'); // BC 2.0 (SPPB PIB)
+                    }
                 }
             } else if (val === '7' || val === '8' || val === '18' || val === '24') {
                 // Ekspor Lini 2 -> Default PEB (30)
                 if (!$('#kode-dok').val()) {
                     $('#kode-dok').val('30');
                 }
+            }
+
+            // Terapkan timestamp otomatis bila data kontainer sudah dimuat
+            if (window.selectedContainerData) {
+                applySmartTimestamp(window.selectedContainerData);
             }
         }
 
@@ -847,7 +1092,8 @@ $nowDmyHis = date('d-m-Y H:i:s');
                     delay: 250,
                     data: function (params) {
                         return {
-                            q: params.term || ''
+                            q: params.term || '',
+                            dept: currentDept
                         };
                     },
                     processResults: function (data) {
@@ -870,6 +1116,7 @@ $nowDmyHis = date('d-m-Y H:i:s');
 
             // Event saat pilihan dihapus
             $('#no-cont').on('select2:clear select2:unselect', function () {
+                window.selectedContainerData = null;
                 setTimeout(updateJsonPreview, 50);
             });
 
@@ -884,9 +1131,16 @@ $nowDmyHis = date('d-m-Y H:i:s');
             if (!item.container_no) return item.text;
 
             const isEmp = item.status === 'EMPTY';
+            const isLcl = item.status === 'LCL';
             const badgeStatus = isEmp 
                 ? `<span class="badge-pill badge-out" style="font-size:0.72rem; padding:2px 6px;">EMPTY</span>` 
-                : `<span class="badge-pill badge-in" style="font-size:0.72rem; padding:2px 6px;">FULL</span>`;
+                : (isLcl 
+                    ? `<span class="badge-pill" style="background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245, 158, 11, 0.3); font-size:0.72rem; padding:2px 6px;">LCL</span>`
+                    : `<span class="badge-pill badge-in" style="font-size:0.72rem; padding:2px 6px;">FCL</span>`);
+
+            const badgeDept = item.departemen === 'GUDANG'
+                ? `<span class="badge-pill" style="background:rgba(16, 185, 129, 0.15); color:#10b981; border:1px solid rgba(16, 185, 129, 0.3); font-size:0.7rem; padding:2px 6px;">🏬 GUDANG</span>`
+                : `<span class="badge-pill" style="background:rgba(59, 130, 246, 0.15); color:#60a5fa; border:1px solid rgba(59, 130, 246, 0.3); font-size:0.7rem; padding:2px 6px;">🏢 TPP</span>`;
 
             const badgeSent = item.already_sent 
                 ? `<span class="badge-pill" style="background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245, 158, 11, 0.35); font-size:0.7rem; padding:2px 6px;">Pernah Terkirim</span>` 
@@ -896,8 +1150,9 @@ $nowDmyHis = date('d-m-Y H:i:s');
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <strong style="font-family:'JetBrains Mono',monospace; color:var(--text-primary); font-size:0.92rem;">${item.container_no}</strong>
+                        ${badgeDept}
                         ${badgeStatus}
-                        <span class="badge-pill badge-ceisa" style="font-size:0.72rem; padding:2px 6px;">${item.size_type || '40GP'}</span>
+                        <span class="badge-pill badge-ceisa" style="font-size:0.72rem; padding:2px 6px;">${item.size_type || '40'} ft</span>
                         ${badgeSent}
                     </div>
                     ${item.yard_block ? `<span style="font-size:0.78rem; color:var(--text-secondary);">📍 ${item.yard_block}${item.slot ? ' S:'+item.slot : ''}${item.tier ? ' T:'+item.tier : ''}</span>` : ''}
@@ -908,6 +1163,7 @@ $nowDmyHis = date('d-m-Y H:i:s');
             if (item.no_bl) subInfo.push(`B/L: <span style="color:var(--accent-blue);">${item.no_bl}</span>`);
             if (item.nopol) subInfo.push(`Nopol: <b>${item.nopol}</b>`);
             if (item.no_dokumen) subInfo.push(`Dok: ${item.no_dokumen}`);
+            if (item.waktu_stripping) subInfo.push(`Stripping: ${item.waktu_stripping.split(' ')[0]}`);
 
             if (subInfo.length > 0) {
                 html += `<div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">${subInfo.join(' &bull; ')}</div>`;
@@ -917,14 +1173,28 @@ $nowDmyHis = date('d-m-Y H:i:s');
         }
 
         function formatContainerSelection(item) {
-            return item.container_no || item.id || item.text || '-- Ketik atau Pilih Nomor Kontainer --';
+            const val = item.container_no || item.id || item.text || '';
+            return val ? val.replace(/[\s\-]/g, '').toUpperCase() : '-- Ketik atau Pilih Nomor Kontainer --';
         }
 
         function autoFillContainerData(item) {
             if (!item) return;
 
+            window.selectedContainerData = item;
+
+            // Pastikan nomor kontainer bersih tanpa spasi atau dash
+            const contClean = (item.container_no || item.id || '').replace(/[\s\-]/g, '').toUpperCase();
+            if ($('#no-cont').val() !== contClean) {
+                if ($('#no-cont').find("option[value='" + contClean + "']").length) {
+                    $('#no-cont').val(contClean);
+                } else {
+                    const newOption = new Option(contClean, contClean, true, true);
+                    $('#no-cont').append(newOption);
+                }
+            }
+
             // 1. Ukuran Kontainer (Readonly)
-            const sz = item.size || (item.size_type && item.size_type.includes('20') ? '20' : (item.size_type && item.size_type.includes('45') ? '45' : '40'));
+            const sz = item.size || (item.size_type && item.size_type.toString().includes('20') ? '20' : (item.size_type && item.size_type.toString().includes('45') ? '45' : '40'));
             $('#ukuran-cont').val(sz);
             $('#ukuran-cont-display').val(sz + ' ft');
 
@@ -949,28 +1219,46 @@ $nowDmyHis = date('d-m-Y H:i:s');
             $('#no-bl').val(item.no_bl || '');
             $('#tgl-bl').val(item.tgl_bl || '');
 
-            // 6. Dokumen Pabean (BC 1.1 / Dokumen Terkait)
-            if (item.no_dokumen) {
-                $('#no-dok').val(item.no_dokumen);
-                $('#kode-dok').val('20'); // BC 1.1
+            // 6. Dokumen Pabean & Pengangkutan Berdasarkan Departemen
+            if (item.departemen === 'GUDANG') {
+                // Untuk Gudang (LCL): dokumen kedatangan kontainer adalah Master B/L (704) atau Manifes (11)
+                if (item.no_bl) {
+                    $('#no-dok').val(item.no_bl);
+                    $('#tgl-dok').val(item.tgl_bl || '');
+                    $('#kode-dok').val('704'); // 704 = MASTER B/L
+                } else if (item.no_dokumen) {
+                    $('#no-dok').val(item.no_dokumen);
+                    $('#tgl-dok').val(item.tgl_dokumen || '');
+                    $('#kode-dok').val('11'); // 11 = MANIFES (BC 1.1)
+                }
+            } else {
+                // Untuk TPP (PLP): dokumen kedatangan kontainer adalah Persetujuan PLP (3)
+                if (item.no_dokumen || item.no_plp) {
+                    $('#no-dok').val(item.no_dokumen || item.no_plp);
+                    $('#tgl-dok').val(item.tgl_dokumen || item.tgl_plp || '');
+                    $('#kode-dok').val('3'); // 3 = Persetujuan PLP
+                }
             }
-            if (item.tgl_dokumen) {
-                $('#tgl-dok').val(item.tgl_dokumen);
-            }
+
+            // 7. Waktu Kegiatan Cerdas
+            applySmartTimestamp(item);
 
             // Update live preview & beri notifikasi toast
             updateJsonPreview();
             
+            const deptLabel = item.departemen || (currentDept === 'gudang' ? 'Gudang' : 'TPP');
             if (item.already_sent) {
-                showToast(`ℹ️ Kontainer ${item.container_no} sudah pernah dikirim sebelumnya (${item.last_tracked_status})`, 'info');
+                showToast(`ℹ️ Kontainer [${deptLabel}] ${contClean} sudah pernah dikirim sebelumnya (${item.last_tracked_status})`, 'info');
             } else {
-                showToast(`Data kontainer ${item.container_no || item.id} berhasil dimuat otomatis!`, 'success');
+                showToast(`Data kontainer [${deptLabel}] ${contClean} berhasil dimuat otomatis!`, 'success');
             }
         }
 
         function buildPayload() {
-            const contVal = ($('#no-cont').val() || '').trim().toUpperCase();
+            const rawCont = ($('#no-cont').val() || '').trim().toUpperCase();
+            const contVal = rawCont.replace(/[\s\-]/g, '');
             const payload = {
+                departemen: currentDept.toUpperCase(),
                 nomorKontainer: contVal,
                 ukuranKontainer: $('#ukuran-cont').val(),
                 jenisKontainer: $('#jenis-cont').val(),
@@ -1015,13 +1303,44 @@ $nowDmyHis = date('d-m-Y H:i:s');
 
         function updateJsonPreview() {
             currentPayload = buildPayload();
+            const btnSend = document.getElementById('btn-submit-tracking');
+            const contVal = currentPayload.nomorKontainer;
+
+            // Jika belum ada nomor kontainer, kosongkan JSON preview dan nonaktifkan tombol kirim
+            if (!contVal || contVal.length < 4) {
+                $('#json-tracking-preview').val('{\n    // Silakan ketik atau pilih nomor kontainer terlebih dahulu\n}');
+                $('#schema-status').html('<span style="color:var(--text-secondary);">⚠️ Nomor Kontainer Belum Diisi</span>');
+                if (btnSend) {
+                    btnSend.disabled = true;
+                    btnSend.style.opacity = '0.45';
+                    btnSend.style.cursor = 'not-allowed';
+                    btnSend.style.filter = 'grayscale(0.7)';
+                    btnSend.title = 'Silakan pilih atau ketik nomor kontainer terlebih dahulu';
+                }
+                return;
+            }
+
             $('#json-tracking-preview').val(JSON.stringify(currentPayload, null, 4));
 
             const isValid = !!(currentPayload.nomorKontainer && currentPayload.ukuranKontainer && currentPayload.jenisKontainer && currentPayload.kodeTps && currentPayload.kodeGudang && currentPayload.kodeKegiatan && currentPayload.waktuKegiatan);
             if (isValid) {
                 $('#schema-status').html('<span style="color:#10b981;">✓ Parameter Wajib Terisi</span>');
+                if (btnSend) {
+                    btnSend.disabled = false;
+                    btnSend.style.opacity = '1';
+                    btnSend.style.cursor = 'pointer';
+                    btnSend.style.filter = 'none';
+                    btnSend.title = 'Kirim data tracking ke gateway CEISA 4.0';
+                }
             } else {
                 $('#schema-status').html('<span style="color:#f59e0b;">⚠️ Field Bertanda * Wajib Diisi</span>');
+                if (btnSend) {
+                    btnSend.disabled = true;
+                    btnSend.style.opacity = '0.45';
+                    btnSend.style.cursor = 'not-allowed';
+                    btnSend.style.filter = 'grayscale(0.7)';
+                    btnSend.title = 'Lengkapi field bertanda * terlebih dahulu';
+                }
             }
         }
 
@@ -1192,17 +1511,28 @@ $nowDmyHis = date('d-m-Y H:i:s');
                                         <b>Waktu:</b> ${dupData.waktuKegiatan || payload.waktuKegiatan}
                                     </div>
                                 </div>
-
+                                <div style="font-size:12.5px; color:var(--text-secondary); margin-bottom:10px;">
+                                    💡 <b>Solusi:</b> Jika pergerakan ini ingin dicatat dengan waktu baru, klik tombol <b>Gunakan Waktu Sekarang & Kirim Ulang</b> di bawah.
+                                </div>
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                                     <span style="font-weight:600; font-size:12px; color:var(--text-secondary);">RAW RESPONSE CEISA 4.0 (HTTP 409):</span>
                                     <button type="button" class="field-action-btn" onclick="navigator.clipboard.writeText($('#modal-dup-json').text()); showToast('JSON disalin ke clipboard!','success');">📋 Salin JSON</button>
                                 </div>
-                                <pre id="modal-dup-json" style="background:#0d131f; color:#38bdf8; padding:12px; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.5; max-height:220px; overflow:auto; margin:0; border:1px solid #1e293b;">${JSON.stringify(ceisaRaw, null, 4)}</pre>
+                                <pre id="modal-dup-json" style="background:#0d131f; color:#38bdf8; padding:12px; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.5; max-height:180px; overflow:auto; margin:0; border:1px solid #1e293b;">${JSON.stringify(ceisaRaw, null, 4)}</pre>
                             </div>
                         `,
                         icon: 'warning',
-                        confirmButtonText: 'Tutup',
-                        confirmButtonColor: '#f59e0b'
+                        showCancelButton: true,
+                        confirmButtonText: '⏱️ Gunakan Waktu Sekarang & Kirim Ulang',
+                        cancelButtonText: 'Tutup & Edit Manual',
+                        confirmButtonColor: '#10b981',
+                        cancelButtonColor: '#64748b'
+                    }).then(r => {
+                        if (r.isConfirmed) {
+                            setNowTime();
+                            showToast('Waktu kegiatan diset ke sekarang. Mengirim ulang tracking...', 'info');
+                            setTimeout(() => submitTracking(), 400);
+                        }
                     });
                     showToast('Kontainer sudah pernah dikirim sebelumnya (HTTP 409)', 'info');
                 } else {

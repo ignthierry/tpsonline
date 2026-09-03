@@ -220,6 +220,26 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
 <script>
 (function() {
     function initSidebarToggle() {
+        // Helper to close all other menus (Accordion Mode)
+        function closeAllExcept(activeToggle) {
+            if (kirimToggle && kirimToggle !== activeToggle) {
+                kirimToggle.classList.remove('expanded');
+                if (kirimSubitems) kirimSubitems.classList.remove('open');
+            }
+            if (lapToggle && lapToggle !== activeToggle) {
+                lapToggle.classList.remove('expanded');
+                if (lapSubitems) lapSubitems.classList.remove('open');
+            }
+            var allCats = document.querySelectorAll('.dynamic-cat-toggle');
+            for (var c = 0; c < allCats.length; c++) {
+                if (allCats[c] !== activeToggle) {
+                    allCats[c].classList.remove('expanded');
+                    if (allCats[c].nextElementSibling) allCats[c].nextElementSibling.classList.remove('open');
+                }
+            }
+        }
+        window.closeAllSidebarExcept = closeAllExcept;
+
         // Kirim Data toggle (aktif di semua halaman)
         var kirimToggle = document.getElementById('kirimDataToggle');
         var kirimSubitems = document.getElementById('kirimDataSubitems');
@@ -233,6 +253,7 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                     kirimToggle.classList.remove('expanded');
                     kirimSubitems.classList.remove('open');
                 } else {
+                    closeAllExcept(kirimToggle);
                     kirimToggle.classList.add('expanded');
                     kirimSubitems.classList.add('open');
                 }
@@ -252,6 +273,7 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                     lapToggle.classList.remove('expanded');
                     lapSubitems.classList.remove('open');
                 } else {
+                    closeAllExcept(lapToggle);
                     lapToggle.classList.add('expanded');
                     lapSubitems.classList.add('open');
                 }
@@ -275,6 +297,7 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                         catToggle.classList.remove('expanded');
                         if (catSubitems) catSubitems.classList.remove('open');
                     } else {
+                        closeAllExcept(catToggle);
                         catToggle.classList.add('expanded');
                         if (catSubitems) catSubitems.classList.add('open');
                     }

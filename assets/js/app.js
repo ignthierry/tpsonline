@@ -137,6 +137,7 @@
             item.classList.remove('expanded');
             if (subitems) subitems.classList.remove('open');
         } else {
+            closeOtherSidebarSections(item);
             item.classList.add('expanded');
             if (subitems) subitems.classList.add('open');
         }
@@ -208,6 +209,86 @@
         }
     }
 
+    // ===== Sidebar Navigation Helpers =====
+    function closeOtherSidebarSections(exceptEl) {
+        const kirimToggle = document.getElementById('kirimDataToggle');
+        const kirimSub = document.getElementById('kirimDataSubitems');
+        if (kirimToggle && kirimToggle !== exceptEl) {
+            kirimToggle.classList.remove('expanded');
+            if (kirimSub) kirimSub.classList.remove('open');
+        }
+
+        const lapToggle = document.getElementById('laporanToggle');
+        const lapSub = document.getElementById('laporanSubitems');
+        if (lapToggle && lapToggle !== exceptEl) {
+            lapToggle.classList.remove('expanded');
+            if (lapSub) lapSub.classList.remove('open');
+        }
+
+        document.querySelectorAll('.dynamic-cat-toggle').forEach(t => {
+            if (t !== exceptEl) {
+                t.classList.remove('expanded');
+                if (t.nextElementSibling) t.nextElementSibling.classList.remove('open');
+            }
+        });
+    }
+
+    function openSidebarMenu(toggleId, subitemsId) {
+        const toggle = document.getElementById(toggleId);
+        const subitems = document.getElementById(subitemsId);
+
+        // Tutup sub-menu lain terlebih dahulu (accordion mode)
+        closeOtherSidebarSections(toggle);
+
+        // Buka mobile menu jika tertutup
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (sidebar && window.innerWidth <= 992) {
+            sidebar.classList.add('open');
+            if (overlay) overlay.classList.add('visible');
+        }
+
+        if (toggle) {
+            if (!toggle.classList.contains('expanded')) {
+                toggle.classList.add('expanded');
+                if (subitems) subitems.classList.add('open');
+            }
+            toggle.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            toggle.classList.remove('nav-highlight-pulse');
+            void toggle.offsetWidth;
+            toggle.classList.add('nav-highlight-pulse');
+            setTimeout(() => toggle.classList.remove('nav-highlight-pulse'), 1800);
+        }
+    }
+
+    function openSidebarCategory(catKey) {
+        const item = document.querySelector(`.nav-item[data-category="${catKey}"]`);
+
+        // Tutup sub-menu lain terlebih dahulu (accordion mode)
+        closeOtherSidebarSections(item);
+
+        // Buka mobile menu jika tertutup
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (sidebar && window.innerWidth <= 992) {
+            sidebar.classList.add('open');
+            if (overlay) overlay.classList.add('visible');
+        }
+
+        if (item) {
+            const subitems = item.nextElementSibling;
+            if (!item.classList.contains('expanded')) {
+                item.classList.add('expanded');
+                if (subitems) subitems.classList.add('open');
+            }
+            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            item.classList.remove('nav-highlight-pulse');
+            void item.offsetWidth;
+            item.classList.add('nav-highlight-pulse');
+            setTimeout(() => item.classList.remove('nav-highlight-pulse'), 1800);
+        }
+    }
+
     // ===== Home Page =====
     function showHomePage() {
         const content = document.getElementById('main-content');
@@ -216,17 +297,17 @@
         if (breadcrumb) breadcrumb.innerHTML = '<span class="current">Dashboard</span>';
 
         let quickCardsHtml = `
-            <div class="quick-card" onclick="window.location.href='cococont.php'" style="border:1px solid rgba(59, 130, 246, 0.4); background:rgba(59, 130, 246, 0.04); cursor:pointer;">
-                <div class="qc-icon">📦</div>
-                <h4>Coarri Codeco (CoCoCont)</h4>
-                <p>Upload Container In & Out ke REST API CEISA 4.0</p>
-                <div class="qc-count" style="color:#3b82f6;">⚡ CEISA 4.0 (In / Out)</div>
+            <div class="quick-card" onclick="CeisaApp.openSidebarMenu('kirimDataToggle', 'kirimDataSubitems')">
+                <div class="qc-icon">📤</div>
+                <h4>Kirim Data</h4>
+                <p>Kirim data Container, Kemasan, Tracking & YOR ke CEISA 4.0</p>
+                <div class="qc-count">5 layanan tersedia</div>
             </div>
         `;
         for (const [catKey, cat] of Object.entries(ENDPOINTS)) {
             const epCount = Object.keys(cat.endpoints).length;
             quickCardsHtml += `
-                <div class="quick-card" onclick="document.querySelector('.nav-item[data-category=${catKey}]')?.click()">
+                <div class="quick-card" onclick="CeisaApp.openSidebarCategory('${catKey}')">
                     <div class="qc-icon">${cat.icon}</div>
                     <h4>${cat.label}</h4>
                     <p>Akses data ${cat.label.toLowerCase()} dari API CEISA</p>
@@ -234,11 +315,78 @@
                 </div>
             `;
         }
+        quickCardsHtml += `
+            <div class="quick-card" onclick="CeisaApp.openSidebarMenu('laporanToggle', 'laporanSubitems')">
+                <div class="qc-icon">📊</div>
+                <h4>Laporan</h4>
+                <p>Monitoring & laporan data Container, Kemasan, Tracking & YOR</p>
+                <div class="qc-count">5 laporan tersedia</div>
+            </div>
+        `;
+
+        const todayStr = new Date().toLocaleDateString('id-ID', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
 
         content.innerHTML = `
-            <div class="welcome-section">
-                <h2>Selamat Datang 👋</h2>
-                <p>Dashboard TPS Online H2H — CEISA 4.0. Pilih menu di sidebar atau klik kategori di bawah untuk mulai menarik data.</p>
+            <div class="welcome-section hero-section">
+                <div class="hero-left">
+                    <div class="hero-badge">
+                        <span class="hero-badge-dot"></span>
+                        <span>CEISA 4.0 REST API • Host-to-Host Connected</span>
+                    </div>
+                    <h2 class="hero-title">Selamat Datang di TPS Online H2H 👋</h2>
+                    <p class="hero-desc">
+                        Sistem otomasi dan integrasi pertukaran data kepabeanan PT. Primamas Segara Utama dengan CEISA 4.0 Bea Cukai. Akses cepat pengiriman Coarri Codeco, respon dokumen pabean, dan pelaporan operasional TPS.
+                    </p>
+                    <div class="hero-actions">
+                        <button type="button" class="btn-hero-primary" onclick="CeisaApp.openSidebarMenu('kirimDataToggle', 'kirimDataSubitems')">
+                            <span>📤</span>
+                            <span>Kirim Data TPS</span>
+                        </button>
+                        <button type="button" class="btn-hero-secondary" onclick="CeisaApp.openSidebarMenu('laporanToggle', 'laporanSubitems')">
+                            <span>📊</span>
+                            <span>Lihat Laporan</span>
+                        </button>
+                        <button type="button" class="btn-hero-tertiary" onclick="refreshAccessToken()">
+                            <span>🔄</span>
+                            <span>Refresh Token SSO</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="hero-right">
+                    <div class="hero-info-card">
+                        <div class="hic-header">
+                            <div class="hic-icon">🏢</div>
+                            <div>
+                                <div class="hic-title">PT. Primamas Segara Utama</div>
+                                <div class="hic-subtitle">TPS Lini 2 • KPPBC TMP A Marunda</div>
+                            </div>
+                        </div>
+                        <div class="hic-divider"></div>
+                        <div class="hic-grid">
+                            <div class="hic-item">
+                                <span class="hic-label">Kode TPS</span>
+                                <span class="hic-val">PSU0</span>
+                            </div>
+                            <div class="hic-item">
+                                <span class="hic-label">Kode Gudang</span>
+                                <span class="hic-val">GPSU</span>
+                            </div>
+                            <div class="hic-item">
+                                <span class="hic-label">Environment</span>
+                                <span class="hic-val badge-env">Sandbox GW</span>
+                            </div>
+                            <div class="hic-item">
+                                <span class="hic-label">Tanggal</span>
+                                <span class="hic-val date-today">${todayStr}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="stats-grid">
                 <div class="stat-card blue">
@@ -809,7 +957,11 @@
         toggleTheme,
         setTheme,
         getPreferredTheme,
+        openSidebarMenu,
+        openSidebarCategory,
     };
+    window.openSidebarMenu = openSidebarMenu;
+    window.openSidebarCategory = openSidebarCategory;
 
     // Auto-init when DOM ready
     if (document.readyState === 'loading') {
