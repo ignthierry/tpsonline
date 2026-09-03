@@ -530,53 +530,62 @@ if ($action === 'send') {
                     json_encode($res['raw'] ?? $res, JSON_UNESCAPED_UNICODE)
                 ]);
 
-                // 2. Simpan setiap kemasan ke ceisa_plp_kemasan & ceisa_sppb_kemasan HANYA jika pengiriman berhasil ke CEISA
+                // 2. Simpan setiap kemasan ke tabel khusus ceisa_cocokms HANYA jika pengiriman berhasil ke CEISA
                 if ($isOk) {
-                    // Simpan ke ceisa_plp_kemasan
-                    $stmtPlpKem = $pdo_tpsonline->prepare("
-                        INSERT INTO ceisa_plp_kemasan 
-                        (idTpsPlp, jenisKemasan, jumlahKemasan, nomorPosBc11, nomorBlAwb, tanggalBlAwb, consignee, flagSetuju)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    $stmtCocokms = $pdo_tpsonline->prepare("
+                        INSERT INTO ceisa_cocokms 
+                        (ref_number, kode_dokumen, kd_tps, kd_gudang, jenis_kemasan, jumlah_kemasan, seri_kemasan, no_bl_awb, tgl_bl_awb, no_pos_bc11, consignee, kontainer_asal, no_dok_inout, tgl_dok_inout, wk_inout, no_polisi, pel_muat, pel_transit, pel_bongkar, no_segel_bc, tgl_segel_bc, bruto, raw_data, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                     ");
 
-                    // Simpan ke ceisa_sppb_kemasan
-                    $stmtSppbKem = $pdo_tpsonline->prepare("
-                        INSERT INTO ceisa_sppb_kemasan 
-                        (car, no_sppb, jml_kemasan, jns_kemasan, kd_jns_kemasan, raw_data, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, NOW())
-                    ");
+                    $kdTps = $header['kodeTps'] ?? 'PSU0';
+                    $kdGudang = $header['kodeGudang'] ?? 'GPSU';
 
                     foreach ($detilList as $item) {
-                        $car = !empty($refNumber) ? $refNumber : ($item['nomorBlAwb'] ?? '');
-                        $noSppb = !empty($item['nomorDokumenInOut']) ? $item['nomorDokumenInOut'] : ($item['nomorDaftarPabean'] ?? '');
+                        $kodeDokumen = (string)($item['kodeDokumen'] ?? ($header['kodeDokumen'] ?? ''));
+                        $jnsKemasan = $item['kodeKemasan'] ?? ($item['jenisKemasan'] ?? 'PK');
                         $jmlKemasan = floatval($item['jumlahKemasan'] ?? 1);
-                        $jnsKemasan = $item['kodeKemasan'] ?? 'PK';
-                        $kdJnsKemasan = !empty($item['seriKemasan']) ? $item['seriKemasan'] : ($item['kodeKemasan'] ?? 'PK');
-                        $nomorPosBc11 = $item['nomorPosBc11'] ?? '';
-                        $nomorBlAwb = $item['nomorBlAwb'] ?? '';
+                        $seriKemasan = $item['seriKemasan'] ?? '';
+                        $nomorBlAwb = $item['nomorBlAwb'] ?? ($item['noBlAwb'] ?? '');
                         $tanggalBlAwb = $item['tanggalBlAwb'] ?? '';
-                        $consignee = $item['consignee'] ?? '';
+                        $nomorPosBc11 = $item['nomorPosBc11'] ?? '';
+                        $consignee = substr(trim(preg_replace('/[\r\n\t]+/', ' ', (string)($item['consignee'] ?? ''))), 0, 150);
+                        $kontainerAsal = $item['kontainerAsal'] ?? ($item['nomorKontainer'] ?? '');
+                        $noDokInOut = $item['nomorDokumenInOut'] ?? ($item['nomorDaftarPabean'] ?? '');
+                        $tglDokInOut = $item['tanggalDokumenInOut'] ?? ($item['tanggalDaftarPabean'] ?? '');
+                        $wkInOut = $item['waktuInOut'] ?? '';
+                        $noPolisi = $item['nomorPolisi'] ?? '';
+                        $pelMuat = $item['pelabuhanMuat'] ?? '';
+                        $pelTransit = $item['pelabuhanTransit'] ?? '';
+                        $pelBongkar = $item['pelabuhanBongkar'] ?? '';
+                        $noSegelBc = $item['nomorSegelBc'] ?? '';
+                        $tglSegelBc = $item['tanggalSegelBc'] ?? '';
+                        $bruto = floatval($item['bruto'] ?? 0);
                         $rawData = json_encode($item, JSON_UNESCAPED_UNICODE);
 
-                        // Eksekusi ceisa_plp_kemasan
-                        $stmtPlpKem->execute([
-                            $car,
+                        $stmtCocokms->execute([
+                            $refNumber,
+                            $kodeDokumen,
+                            $kdTps,
+                            $kdGudang,
                             $jnsKemasan,
                             $jmlKemasan,
-                            $nomorPosBc11,
+                            $seriKemasan,
                             $nomorBlAwb,
                             $tanggalBlAwb,
+                            $nomorPosBc11,
                             $consignee,
-                            'Y'
-                        ]);
-
-                        // Eksekusi ceisa_sppb_kemasan
-                        $stmtSppbKem->execute([
-                            $car,
-                            $noSppb,
-                            $jmlKemasan,
-                            $jnsKemasan,
-                            $kdJnsKemasan,
+                            $kontainerAsal,
+                            $noDokInOut,
+                            $tglDokInOut,
+                            $wkInOut,
+                            $noPolisi,
+                            $pelMuat,
+                            $pelTransit,
+                            $pelBongkar,
+                            $noSegelBc,
+                            $tglSegelBc,
+                            $bruto,
                             $rawData
                         ]);
                     }

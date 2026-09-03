@@ -50,80 +50,114 @@ if ($action === 'detail_cont_ref') {
         $parsedResponse = $logData ? json_decode($logData['raw_response'], true) : null;
         $header = $parsedRequest['header'] ?? [];
 
-        // 2. Ambil rincian kontainer dari ceisa_sppb_kontainer
-        $stmtSppb = $pdo_tpsonline->prepare("
-            SELECT id, car, no_sppb, no_cont, uk_cont, jns_cont, jns_muat, status_segel, no_segel, raw_data, created_at 
-            FROM ceisa_sppb_kontainer 
-            WHERE car = ?
+        // 2. Ambil rincian kontainer dari tabel khusus ceisa_cococont
+        $stmtCoco = $pdo_tpsonline->prepare("
+            SELECT * FROM ceisa_cococont 
+            WHERE ref_number = ?
             ORDER BY id ASC
         ");
-        $stmtSppb->execute([$refNumber]);
-        $sppbRows = $stmtSppb->fetchAll(PDO::FETCH_ASSOC);
-
-        // 3. Ambil juga dari ceisa_plp_kontainer untuk melengkapi nomor pos & consignee
-        $stmtPlp = $pdo_tpsonline->prepare("
-            SELECT id, idTpsPlp, nomorKontainer, ukuranKontainer, jenisMuat, nomorPosBc11, nomorHostBl, tanggalHostBl, namaPemilik, flagSetuju 
-            FROM ceisa_plp_kontainer 
-            WHERE idTpsPlp = ?
-            ORDER BY id ASC
-        ");
-        $stmtPlp->execute([$refNumber]);
-        $plpRows = $stmtPlp->fetchAll(PDO::FETCH_ASSOC);
+        $stmtCoco->execute([$refNumber]);
+        $cocoRows = $stmtCoco->fetchAll(PDO::FETCH_ASSOC);
 
         $containers = [];
-        $plpMap = [];
-        foreach ($plpRows as $plp) {
-            $cNo = strtoupper(trim($plp['nomorKontainer']));
-            $plpMap[$cNo] = $plp;
-        }
 
-        if (!empty($sppbRows)) {
-            foreach ($sppbRows as $s) {
-                $cNo = strtoupper(trim($s['no_cont']));
-                $plpInfo = $plpMap[$cNo] ?? [];
-                $rawDetail = !empty($s['raw_data']) ? json_decode($s['raw_data'], true) : [];
-
+        if (!empty($cocoRows)) {
+            foreach ($cocoRows as $c) {
+                $rawDetail = !empty($c['raw_data']) ? json_decode($c['raw_data'], true) : [];
                 $containers[] = [
-                    'noCont'              => $s['no_cont'],
-                    'ukuran'              => $s['uk_cont'] . ' ft',
-                    'jenisCont'           => $s['jns_cont'],
-                    'jenisMuat'           => ($s['jns_muat'] === 'E') ? 'Kosong (Empty)' : 'Isi (Full)',
-                    'noSppb'              => $s['no_sppb'],
-                    'statusSegel'         => $s['status_segel'],
-                    'noSegel'             => $s['no_segel'] ?: '-',
-                    'nomorPosBc11'        => $rawDetail['nomorPosBc11'] ?? ($plpInfo['nomorPosBc11'] ?? '-'),
-                    'noBlAwb'             => $rawDetail['noBlAwb'] ?? ($plpInfo['nomorHostBl'] ?? '-'),
-                    'tanggalBlAwb'        => $rawDetail['tanggalBlAwb'] ?? ($plpInfo['tanggalHostBl'] ?? '-'),
-                    'consignee'           => $rawDetail['consignee'] ?? ($plpInfo['namaPemilik'] ?? '-'),
-                    'nomorDokumenInOut'   => $rawDetail['nomorDokumenInOut'] ?? ($s['no_sppb'] ?? '-'),
-                    'tanggalDokumenInOut' => $rawDetail['tanggalDokumenInOut'] ?? '-',
-                    'waktuInOut'          => $rawDetail['waktuInOut'] ?? '-',
-                    'nomorPolisi'         => $rawDetail['nomorPolisi'] ?? '-',
+                    'noCont'              => $c['no_kontainer'],
+                    'ukuran'              => (!empty($c['ukuran']) ? $c['ukuran'] . ' ft' : '20 ft'),
+                    'jenisCont'           => $c['jenis_kontainer'] ?? '4',
+                    'jenisMuat'           => ($c['jenis_muat'] === 'E') ? 'Kosong (Empty)' : 'Isi (Full)',
+                    'noSppb'              => $c['no_dok_inout'] ?: '-',
+                    'statusSegel'         => $c['status_segel'] ?: '-',
+                    'noSegel'             => $c['no_segel'] ?: '-',
+                    'nomorPosBc11'        => $c['no_pos_bc11'] ?: '-',
+                    'noBlAwb'             => $c['no_bl_awb'] ?: '-',
+                    'tanggalBlAwb'        => $c['tgl_bl_awb'] ?: '-',
+                    'consignee'           => $c['consignee'] ?: '-',
+                    'nomorDokumenInOut'   => $c['no_dok_inout'] ?: '-',
+                    'tanggalDokumenInOut' => $c['tgl_dok_inout'] ?: '-',
+                    'waktuInOut'          => $c['wk_inout'] ?: '-',
+                    'nomorPolisi'         => $c['no_polisi'] ?: '-',
                     'bruto'               => $rawDetail['bruto'] ?? 0,
                     'raw'                 => $rawDetail
                 ];
             }
-        } elseif (!empty($plpRows)) {
+        } else {
+            // Fallback ke ceisa_sppb_kontainer / ceisa_plp_kontainer (untuk data historis pengujian lama)
+            $stmtSppb = $pdo_tpsonline->prepare("
+                SELECT id, car, no_sppb, no_cont, uk_cont, jns_cont, jns_muat, status_segel, no_segel, raw_data, created_at 
+                FROM ceisa_sppb_kontainer 
+                WHERE car = ?
+                ORDER BY id ASC
+            ");
+            $stmtSppb->execute([$refNumber]);
+            $sppbRows = $stmtSppb->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmtPlp = $pdo_tpsonline->prepare("
+                SELECT id, idTpsPlp, nomorKontainer, ukuranKontainer, jenisMuat, nomorPosBc11, nomorHostBl, tanggalHostBl, namaPemilik, flagSetuju 
+                FROM ceisa_plp_kontainer 
+                WHERE idTpsPlp = ?
+                ORDER BY id ASC
+            ");
+            $stmtPlp->execute([$refNumber]);
+            $plpRows = $stmtPlp->fetchAll(PDO::FETCH_ASSOC);
+
+            $plpMap = [];
             foreach ($plpRows as $plp) {
-                $containers[] = [
-                    'noCont'              => $plp['nomorKontainer'],
-                    'ukuran'              => $plp['ukuranKontainer'] . ' ft',
-                    'jenisCont'           => 'FCL',
-                    'jenisMuat'           => ($plp['jenisMuat'] === 'E') ? 'Kosong (Empty)' : 'Isi (Full)',
-                    'noSppb'              => '-',
-                    'statusSegel'         => 'TERSEGEL',
-                    'noSegel'             => '-',
-                    'nomorPosBc11'        => $plp['nomorPosBc11'],
-                    'noBlAwb'             => $plp['nomorHostBl'],
-                    'tanggalBlAwb'        => $plp['tanggalHostBl'],
-                    'consignee'           => $plp['namaPemilik'],
-                    'nomorDokumenInOut'   => '-',
-                    'tanggalDokumenInOut' => '-',
-                    'waktuInOut'          => '-',
-                    'nomorPolisi'         => '-',
-                    'bruto'               => 0,
-                    'raw'                 => $plp
-                ];
+                $cNo = strtoupper(trim($plp['nomorKontainer']));
+                $plpMap[$cNo] = $plp;
+            }
+
+            if (!empty($sppbRows)) {
+                foreach ($sppbRows as $s) {
+                    $cNo = strtoupper(trim($s['no_cont']));
+                    $plpInfo = $plpMap[$cNo] ?? [];
+                    $rawDetail = !empty($s['raw_data']) ? json_decode($s['raw_data'], true) : [];
+
+                    $containers[] = [
+                        'noCont'              => $s['no_cont'],
+                        'ukuran'              => $s['uk_cont'] . ' ft',
+                        'jenisCont'           => $s['jns_cont'],
+                        'jenisMuat'           => ($s['jns_muat'] === 'E') ? 'Kosong (Empty)' : 'Isi (Full)',
+                        'noSppb'              => $s['no_sppb'],
+                        'statusSegel'         => $s['status_segel'],
+                        'noSegel'             => $s['no_segel'] ?: '-',
+                        'nomorPosBc11'        => $rawDetail['nomorPosBc11'] ?? ($plpInfo['nomorPosBc11'] ?? '-'),
+                        'noBlAwb'             => $rawDetail['noBlAwb'] ?? ($plpInfo['nomorHostBl'] ?? '-'),
+                        'tanggalBlAwb'        => $rawDetail['tanggalBlAwb'] ?? ($plpInfo['tanggalHostBl'] ?? '-'),
+                        'consignee'           => $rawDetail['consignee'] ?? ($plpInfo['namaPemilik'] ?? '-'),
+                        'nomorDokumenInOut'   => $rawDetail['nomorDokumenInOut'] ?? ($s['no_sppb'] ?? '-'),
+                        'tanggalDokumenInOut' => $rawDetail['tanggalDokumenInOut'] ?? '-',
+                        'waktuInOut'          => $rawDetail['waktuInOut'] ?? '-',
+                        'nomorPolisi'         => $rawDetail['nomorPolisi'] ?? '-',
+                        'bruto'               => $rawDetail['bruto'] ?? 0,
+                        'raw'                 => $rawDetail
+                    ];
+                }
+            } elseif (!empty($plpRows)) {
+                foreach ($plpRows as $plp) {
+                    $containers[] = [
+                        'noCont'              => $plp['nomorKontainer'],
+                        'ukuran'              => $plp['ukuranKontainer'] . ' ft',
+                        'jenisCont'           => '-',
+                        'jenisMuat'           => ($plp['jenisMuat'] === 'E') ? 'Kosong (Empty)' : 'Isi (Full)',
+                        'noSppb'              => '-',
+                        'statusSegel'         => '-',
+                        'noSegel'             => '-',
+                        'nomorPosBc11'        => $plp['nomorPosBc11'] ?: '-',
+                        'noBlAwb'             => $plp['nomorHostBl'] ?: '-',
+                        'tanggalBlAwb'        => $plp['tanggalHostBl'] ?: '-',
+                        'consignee'           => $plp['namaPemilik'] ?: '-',
+                        'nomorDokumenInOut'   => '-',
+                        'tanggalDokumenInOut' => '-',
+                        'waktuInOut'          => '-',
+                        'nomorPolisi'         => '-',
+                        'bruto'               => 0,
+                        'raw'                 => $plp
+                    ];
+                }
             }
         }
 
@@ -177,63 +211,93 @@ if ($action === 'detail_kms_ref') {
         $parsedResponse = $logData ? json_decode($logData['raw_response'], true) : null;
         $header = $parsedRequest['header'] ?? [];
 
-        // 2. Ambil rincian kemasan dari ceisa_sppb_kemasan
-        $stmtSppb = $pdo_tpsonline->prepare("
-            SELECT id, car, no_sppb, jml_kemasan, jns_kemasan, kd_jns_kemasan, raw_data, created_at 
-            FROM ceisa_sppb_kemasan 
-            WHERE car = ?
+        // 2. Ambil rincian kemasan dari tabel khusus ceisa_cocokms
+        $stmtCocoKms = $pdo_tpsonline->prepare("
+            SELECT * FROM ceisa_cocokms 
+            WHERE ref_number = ?
             ORDER BY id ASC
         ");
-        $stmtSppb->execute([$refNumber]);
-        $sppbRows = $stmtSppb->fetchAll(PDO::FETCH_ASSOC);
-
-        // 3. Ambil juga dari ceisa_plp_kemasan
-        $stmtPlp = $pdo_tpsonline->prepare("
-            SELECT id, idTpsPlp, jenisKemasan, jumlahKemasan, nomorPosBc11, nomorBlAwb, tanggalBlAwb, consignee, flagSetuju 
-            FROM ceisa_plp_kemasan 
-            WHERE idTpsPlp = ?
-            ORDER BY id ASC
-        ");
-        $stmtPlp->execute([$refNumber]);
-        $plpRows = $stmtPlp->fetchAll(PDO::FETCH_ASSOC);
+        $stmtCocoKms->execute([$refNumber]);
+        $cocoKmsRows = $stmtCocoKms->fetchAll(PDO::FETCH_ASSOC);
 
         $packages = [];
-        if (!empty($sppbRows)) {
-            foreach ($sppbRows as $s) {
-                $rawDetail = !empty($s['raw_data']) ? json_decode($s['raw_data'], true) : [];
+
+        if (!empty($cocoKmsRows)) {
+            foreach ($cocoKmsRows as $k) {
+                $rawDetail = !empty($k['raw_data']) ? json_decode($k['raw_data'], true) : [];
                 $packages[] = [
-                    'jenisKemasan'        => $s['jns_kemasan'],
-                    'jumlahKemasan'       => (float)($s['jml_kemasan'] ?? ($rawDetail['jumlahKemasan'] ?? 0)),
-                    'noSppb'              => $s['no_sppb'],
-                    'noBlAwb'             => $rawDetail['nomorBlAwb'] ?? ($rawDetail['noBlAwb'] ?? '-'),
-                    'tanggalBlAwb'        => $rawDetail['tanggalBlAwb'] ?? '-',
-                    'nomorPosBc11'        => $rawDetail['nomorPosBc11'] ?? '-',
-                    'consignee'           => $rawDetail['consignee'] ?? '-',
-                    'kontainerAsal'       => $rawDetail['kontainerAsal'] ?? '-',
-                    'nomorPolisi'         => $rawDetail['nomorPolisi'] ?? '-',
-                    'waktuInOut'          => $rawDetail['waktuInOut'] ?? '-',
-                    'noSegelBc'           => $rawDetail['nomorSegelBc'] ?? '-',
-                    'bruto'               => $rawDetail['bruto'] ?? 0,
+                    'jenisKemasan'        => $k['jenis_kemasan'] ?: 'PK',
+                    'jumlahKemasan'       => (float)($k['jumlah_kemasan'] ?? 0),
+                    'noSppb'              => $k['no_dok_inout'] ?: '-',
+                    'noBlAwb'             => $k['no_bl_awb'] ?: '-',
+                    'tanggalBlAwb'        => $k['tgl_bl_awb'] ?: '-',
+                    'nomorPosBc11'        => $k['no_pos_bc11'] ?: '-',
+                    'consignee'           => $k['consignee'] ?: '-',
+                    'kontainerAsal'       => $k['kontainer_asal'] ?: '-',
+                    'nomorPolisi'         => $k['no_polisi'] ?: '-',
+                    'waktuInOut'          => $k['wk_inout'] ?: '-',
+                    'noSegelBc'           => $k['no_segel_bc'] ?: '-',
+                    'bruto'               => (float)($k['bruto'] ?? 0),
                     'raw'                 => $rawDetail
                 ];
             }
-        } elseif (!empty($plpRows)) {
-            foreach ($plpRows as $plp) {
-                $packages[] = [
-                    'jenisKemasan'        => $plp['jenisKemasan'],
-                    'jumlahKemasan'       => (float)($plp['jumlahKemasan'] ?? 0),
-                    'noSppb'              => '-',
-                    'noBlAwb'             => $plp['nomorBlAwb'],
-                    'tanggalBlAwb'        => $plp['tanggalBlAwb'],
-                    'nomorPosBc11'        => $plp['nomorPosBc11'],
-                    'consignee'           => $plp['consignee'],
-                    'kontainerAsal'       => '-',
-                    'nomorPolisi'         => '-',
-                    'waktuInOut'          => '-',
-                    'noSegelBc'           => '-',
-                    'bruto'               => 0,
-                    'raw'                 => $plp
-                ];
+        } else {
+            // Fallback ke ceisa_sppb_kemasan / ceisa_plp_kemasan (untuk data historis pengujian lama)
+            $stmtSppb = $pdo_tpsonline->prepare("
+                SELECT id, car, no_sppb, jml_kemasan, jns_kemasan, kd_jns_kemasan, raw_data, created_at 
+                FROM ceisa_sppb_kemasan 
+                WHERE car = ?
+                ORDER BY id ASC
+            ");
+            $stmtSppb->execute([$refNumber]);
+            $sppbRows = $stmtSppb->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmtPlp = $pdo_tpsonline->prepare("
+                SELECT id, idTpsPlp, jenisKemasan, jumlahKemasan, nomorPosBc11, nomorBlAwb, tanggalBlAwb, consignee, flagSetuju 
+                FROM ceisa_plp_kemasan 
+                WHERE idTpsPlp = ?
+                ORDER BY id ASC
+            ");
+            $stmtPlp->execute([$refNumber]);
+            $plpRows = $stmtPlp->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($sppbRows)) {
+                foreach ($sppbRows as $s) {
+                    $rawDetail = !empty($s['raw_data']) ? json_decode($s['raw_data'], true) : [];
+                    $packages[] = [
+                        'jenisKemasan'        => $s['jns_kemasan'],
+                        'jumlahKemasan'       => (float)($s['jml_kemasan'] ?? ($rawDetail['jumlahKemasan'] ?? 0)),
+                        'noSppb'              => $s['no_sppb'],
+                        'noBlAwb'             => $rawDetail['nomorBlAwb'] ?? ($rawDetail['noBlAwb'] ?? '-'),
+                        'tanggalBlAwb'        => $rawDetail['tanggalBlAwb'] ?? '-',
+                        'nomorPosBc11'        => $rawDetail['nomorPosBc11'] ?? '-',
+                        'consignee'           => $rawDetail['consignee'] ?? '-',
+                        'kontainerAsal'       => $rawDetail['kontainerAsal'] ?? '-',
+                        'nomorPolisi'         => $rawDetail['nomorPolisi'] ?? '-',
+                        'waktuInOut'          => $rawDetail['waktuInOut'] ?? '-',
+                        'noSegelBc'           => $rawDetail['nomorSegelBc'] ?? '-',
+                        'bruto'               => $rawDetail['bruto'] ?? 0,
+                        'raw'                 => $rawDetail
+                    ];
+                }
+            } elseif (!empty($plpRows)) {
+                foreach ($plpRows as $plp) {
+                    $packages[] = [
+                        'jenisKemasan'        => $plp['jenisKemasan'],
+                        'jumlahKemasan'       => (float)($plp['jumlahKemasan'] ?? 0),
+                        'noSppb'              => '-',
+                        'noBlAwb'             => $plp['nomorBlAwb'],
+                        'tanggalBlAwb'        => $plp['tanggalBlAwb'],
+                        'nomorPosBc11'        => $plp['nomorPosBc11'],
+                        'consignee'           => $plp['consignee'],
+                        'kontainerAsal'       => '-',
+                        'nomorPolisi'         => '-',
+                        'waktuInOut'          => '-',
+                        'noSegelBc'           => '-',
+                        'bruto'               => 0,
+                        'raw'                 => $plp
+                    ];
+                }
             }
         }
 

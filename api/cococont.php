@@ -626,61 +626,63 @@ function handleSend() {
                 json_encode($result['raw'] ?? $result, JSON_UNESCAPED_UNICODE)
             ]);
 
-            // 2. Simpan setiap kontainer ke ceisa_plp_kontainer & ceisa_sppb_kontainer HANYA jika pengiriman berhasil ke CEISA
+            // 2. Simpan setiap kontainer ke tabel khusus ceisa_cococont HANYA jika pengiriman berhasil ke CEISA
             if ($isOk) {
-                // Simpan ke ceisa_plp_kontainer
-                $stmtPlpCont = $pdo_tpsonline->prepare("
-                    INSERT INTO ceisa_plp_kontainer 
-                    (idTpsPlp, nomorKontainer, ukuranKontainer, jenisMuat, nomorPosBc11, nomorHostBl, tanggalHostBl, namaPemilik, flagSetuju)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                $stmtCocont = $pdo_tpsonline->prepare("
+                    INSERT INTO ceisa_cococont 
+                    (ref_number, kode_dokumen, kd_tps, kd_gudang, no_kontainer, ukuran, jenis_kontainer, jenis_muat, tipe_kontainer, status_segel, no_segel, no_bl_awb, tgl_bl_awb, no_pos_bc11, consignee, no_dok_inout, tgl_dok_inout, wk_inout, no_polisi, pel_muat, pel_transit, pel_bongkar, raw_data, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ");
 
-                // Simpan ke ceisa_sppb_kontainer
-                $stmtSppbCont = $pdo_tpsonline->prepare("
-                    INSERT INTO ceisa_sppb_kontainer 
-                    (car, no_sppb, no_cont, uk_cont, jns_cont, jns_muat, status_segel, no_segel, raw_data, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-                ");
+                $kdTps = $header['kodeTps'] ?? 'PSU0';
+                $kdGudang = $header['kodeGudang'] ?? 'CPSU';
 
                 foreach ($kontainerList as $c) {
-                    $car = !empty($refNumber) ? $refNumber : ($c['nomorDokumenInOut'] ?? '');
-                    $noSppb = !empty($c['nomorDokumenInOut']) ? $c['nomorDokumenInOut'] : ($c['nomorDaftarPabean'] ?? '');
-                    $noCont = $c['nomorKontainer'] ?? '';
-                    $ukCont = $c['ukuranKontainer'] ?? '20';
-                    $jnsCont = $c['jenisKontainer'] ?? '4';
+                    $noCont = strtoupper(trim((string)($c['nomorKontainer'] ?? '')));
+                    $ukCont = (string)($c['ukuranKontainer'] ?? '20');
+                    $jnsCont = (string)($c['jenisKontainer'] ?? '4');
                     $isKosong = !empty($c['flagKontainerKosong']) && ($c['flagKontainerKosong'] === true || $c['flagKontainerKosong'] == '1');
                     $jnsMuat = $isKosong ? 'E' : 'F';
+                    $tipeCont = (string)($c['tipeKontainer'] ?? '1');
                     $statusSegel = !empty($c['nomorSegelBc']) ? 'TERSEGEL' : 'TIDAK TERSEGEL';
                     $noSegel = !empty($c['nomorSegel']) ? $c['nomorSegel'] : ($c['nomorSegelBc'] ?? '');
                     $noPos = $c['nomorPosBc11'] ?? '';
                     $noBl = $c['noBlAwb'] ?? '';
                     $tglBl = $c['tanggalBlAwb'] ?? '';
-                    $consignee = substr(trim(preg_replace('/[\r\n\t]+/', ' ', (string)($c['consignee'] ?? ''))), 0, 100);
+                    $consignee = substr(trim(preg_replace('/[\r\n\t]+/', ' ', (string)($c['consignee'] ?? ''))), 0, 150);
+                    $noDokInOut = $c['nomorDokumenInOut'] ?? ($c['nomorDaftarPabean'] ?? '');
+                    $tglDokInOut = $c['tanggalDokumenInOut'] ?? ($c['tanggalDaftarPabean'] ?? '');
+                    $wkInOut = $c['waktuInOut'] ?? ($c['waktuKegiatan'] ?? '');
+                    $noPolisi = $c['nomorPolisi'] ?? '';
+                    $pelMuat = $c['pelabuhanMuat'] ?? '';
+                    $pelTransit = $c['pelabuhanTransit'] ?? '';
+                    $pelBongkar = $c['pelabuhanBongkar'] ?? '';
+                    $kodeDokumen = (string)($c['kodeDokumen'] ?? ($header['kodeDokumen'] ?? ''));
                     $rawData = json_encode($c, JSON_UNESCAPED_UNICODE);
 
-                    // Eksekusi ceisa_plp_kontainer
-                    $stmtPlpCont->execute([
-                        $car,
-                        $noCont,
-                        $ukCont,
-                        $jnsMuat,
-                        $noPos,
-                        $noBl,
-                        $tglBl,
-                        $consignee,
-                        'Y'
-                    ]);
-
-                    // Eksekusi ceisa_sppb_kontainer
-                    $stmtSppbCont->execute([
-                        $car,
-                        $noSppb,
+                    $stmtCocont->execute([
+                        $refNumber,
+                        $kodeDokumen,
+                        $kdTps,
+                        $kdGudang,
                         $noCont,
                         $ukCont,
                         $jnsCont,
                         $jnsMuat,
+                        $tipeCont,
                         $statusSegel,
                         $noSegel,
+                        $noBl,
+                        $tglBl,
+                        $noPos,
+                        $consignee,
+                        $noDokInOut,
+                        $tglDokInOut,
+                        $wkInOut,
+                        $noPolisi,
+                        $pelMuat,
+                        $pelTransit,
+                        $pelBongkar,
                         $rawData
                     ]);
                 }
