@@ -15,6 +15,8 @@ $isLaporanYor = ($currentPage === 'laporan_yor.php');
 $isReportYor = ($currentPage === 'report_yor.php');
 // Check if any Kirim Data sub-page is active (for auto-expanding the submenu)
 $isKirimDataActive = ($isCoCoCont || $isCoCoKms || $isTpsTracking || $isTpsTrackingBatch || $isLaporanYor);
+// Check if any Laporan sub-page is active (for auto-expanding the submenu)
+$isLaporanActive = ($isReportCont || $isReportKms || $isReportTracking || $isReportTrackingBatch || $isReportYor);
 if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
     $endpoints = getEndpointDefinitions();
 }
@@ -54,44 +56,6 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
             <a href="post_dokumen.php" class="nav-item <?= $isPostData ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isPostData ? 'cursor:default;' : '' ?>">
                 <span class="nav-icon">📤</span>
                 <span>Kirim Dokumen (POST)</span>
-            </a>
-        </div>
-
-        <!-- Section Laporan -->
-        <div class="nav-section-label" style="margin-top: 15px; padding: 0 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); font-weight: 600;">Laporan</div>
-        <div class="nav-section">
-            <a href="report_cont.php" class="nav-item <?= $isReportCont ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportCont ? 'cursor:default;' : '' ?>">
-                <span class="nav-icon">📊</span>
-                <span>Laporan Coarri Codeco (Container)</span>
-                <span class="nav-badge" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">Container</span>
-            </a>
-        </div>
-        <div class="nav-section">
-            <a href="report_kms.php" class="nav-item <?= $isReportKms ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportKms ? 'cursor:default;' : '' ?>">
-                <span class="nav-icon">📊</span>
-                <span>Laporan Coarri Codeco (Kemasan)</span>
-                <span class="nav-badge" style="background:rgba(139, 92, 246, 0.2); color:#a78bfa; border:1px solid rgba(139,92,246,0.3);">Kemasan</span>
-            </a>
-        </div>
-        <div class="nav-section">
-            <a href="report_tracking.php" class="nav-item <?= $isReportTracking ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportTracking ? 'cursor:default;' : '' ?>">
-                <span class="nav-icon">📍</span>
-                <span>Laporan TPS Tracking (Kontainer)</span>
-                <span class="nav-badge" style="background:rgba(16, 185, 129, 0.2); color:#10b981; border:1px solid rgba(16,185,129,0.3);">Tracking</span>
-            </a>
-        </div>
-        <div class="nav-section">
-            <a href="report_tracking_batch.php" class="nav-item <?= $isReportTrackingBatch ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportTrackingBatch ? 'cursor:default;' : '' ?>">
-                <span class="nav-icon">📦</span>
-                <span>Laporan TPS Tracking Batch</span>
-                <span class="nav-badge" style="background:rgba(245, 158, 11, 0.2); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);">Batch</span>
-            </a>
-        </div>
-        <div class="nav-section">
-            <a href="report_yor.php" class="nav-item <?= $isReportYor ? 'active' : '' ?>" style="text-decoration:none; color:inherit; <?= $isReportYor ? 'cursor:default;' : '' ?>">
-                <span class="nav-icon">📈</span>
-                <span>Laporan YOR Terkirim</span>
-                <span class="nav-badge" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">YOR</span>
             </a>
         </div>
 
@@ -175,6 +139,58 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
             </div>
         </div>
         <?php endforeach; ?>
+
+        <!-- Laporan (Collapsible Submenu) -->
+        <div class="nav-section">
+            <div class="nav-item laporan-toggle <?= $isLaporanActive ? 'expanded' : '' ?>" id="laporanToggle" style="cursor: pointer;">
+                <span class="nav-icon">📊</span>
+                <span>Laporan</span>
+                <span class="nav-badge" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">5</span>
+                <span class="chevron">›</span>
+            </div>
+            <div class="nav-subitems <?= $isLaporanActive ? 'open' : '' ?>" id="laporanSubitems">
+                <!-- Laporan Coarri Codeco (Container) -->
+                <a href="report_cont.php" class="nav-subitem-link <?= $isReportCont ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
+                    <div class="nav-subitem <?= $isReportCont ? 'active' : '' ?>">
+                        <span class="nav-sub-icon">📊</span>
+                        <span>Laporan Coarri Codeco (Container)</span>
+                        <span class="nav-badge-sm" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">Container</span>
+                    </div>
+                </a>
+                <!-- Laporan Coarri Codeco (Kemasan) -->
+                <a href="report_kms.php" class="nav-subitem-link <?= $isReportKms ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
+                    <div class="nav-subitem <?= $isReportKms ? 'active' : '' ?>">
+                        <span class="nav-sub-icon">📊</span>
+                        <span>Laporan Coarri Codeco (Kemasan)</span>
+                        <span class="nav-badge-sm" style="background:rgba(139, 92, 246, 0.2); color:#a78bfa; border:1px solid rgba(139,92,246,0.3);">Kemasan</span>
+                    </div>
+                </a>
+                <!-- Laporan TPS Tracking (Kontainer) -->
+                <a href="report_tracking.php" class="nav-subitem-link <?= $isReportTracking ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
+                    <div class="nav-subitem <?= $isReportTracking ? 'active' : '' ?>">
+                        <span class="nav-sub-icon">📍</span>
+                        <span>Laporan TPS Tracking (Kontainer)</span>
+                        <span class="nav-badge-sm" style="background:rgba(16, 185, 129, 0.2); color:#10b981; border:1px solid rgba(16,185,129,0.3);">Tracking</span>
+                    </div>
+                </a>
+                <!-- Laporan TPS Tracking Batch -->
+                <a href="report_tracking_batch.php" class="nav-subitem-link <?= $isReportTrackingBatch ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
+                    <div class="nav-subitem <?= $isReportTrackingBatch ? 'active' : '' ?>">
+                        <span class="nav-sub-icon">📦</span>
+                        <span>Laporan TPS Tracking Batch</span>
+                        <span class="nav-badge-sm" style="background:rgba(245, 158, 11, 0.2); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);">Batch</span>
+                    </div>
+                </a>
+                <!-- Laporan YOR Terkirim -->
+                <a href="report_yor.php" class="nav-subitem-link <?= $isReportYor ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
+                    <div class="nav-subitem <?= $isReportYor ? 'active' : '' ?>">
+                        <span class="nav-sub-icon">📈</span>
+                        <span>Laporan YOR Terkirim</span>
+                        <span class="nav-badge-sm" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">YOR</span>
+                    </div>
+                </a>
+            </div>
+        </div>
     </nav>
 
     <!-- User Profile Footer in Sidebar -->
@@ -219,6 +235,25 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                 } else {
                     kirimToggle.classList.add('expanded');
                     kirimSubitems.classList.add('open');
+                }
+            });
+        }
+
+        // Laporan toggle (aktif di semua halaman)
+        var lapToggle = document.getElementById('laporanToggle');
+        var lapSubitems = document.getElementById('laporanSubitems');
+        if (lapToggle && lapSubitems && !lapToggle.dataset.bound) {
+            lapToggle.dataset.bound = 'true';
+            lapToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var isOpen = lapToggle.classList.contains('expanded');
+                if (isOpen) {
+                    lapToggle.classList.remove('expanded');
+                    lapSubitems.classList.remove('open');
+                } else {
+                    lapToggle.classList.add('expanded');
+                    lapSubitems.classList.add('open');
                 }
             });
         }

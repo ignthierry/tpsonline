@@ -395,8 +395,9 @@ body {
     flex-shrink: 0;
 }
 
-/* Kirim Data toggle parent highlight when child is active */
-.kirim-data-toggle.expanded {
+/* Kirim Data and Laporan toggle parent highlight when child is active */
+.kirim-data-toggle.expanded,
+.laporan-toggle.expanded {
     color: var(--accent-blue);
     background-color: rgba(59, 130, 246, 0.08);
 }
