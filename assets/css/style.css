@@ -363,6 +363,44 @@ body {
     font-weight: 600;
 }
 
+/* Sub-item links (for Kirim Data submenu) */
+.nav-subitem-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.nav-subitem-link .nav-subitem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: normal;
+}
+
+.nav-sub-icon {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+}
+
+.nav-badge-sm {
+    font-size: 0.62rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* Kirim Data toggle parent highlight when child is active */
+.kirim-data-toggle.expanded {
+    color: var(--accent-blue);
+    background-color: rgba(59, 130, 246, 0.08);
+}
+
 /* ===== MAIN CONTENT AREA ===== */
 .main-content {
     flex: 1;
