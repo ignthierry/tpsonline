@@ -108,7 +108,8 @@ if ($action === 'send') {
             'kodeTps'         => strtoupper(trim((string)$item['kodeTps'])),
             'kodeGudang'      => strtoupper(trim((string)$item['kodeGudang'])),
             'kodeKegiatan'    => (int)$item['kodeKegiatan'],
-            'waktuKegiatan'   => trim((string)$item['waktuKegiatan'])
+            'waktuKegiatan'   => trim((string)$item['waktuKegiatan']),
+            'departemen'      => !empty($item['departemen']) ? strtoupper(trim((string)$item['departemen'])) : ((strtoupper(trim((string)$item['kodeGudang'])) === 'GPSU') ? 'GUDANG' : 'TPP')
         ];
 
         // Validasi ukuran
@@ -140,6 +141,18 @@ if ($action === 'send') {
                 }
                 if ($f === 'nomorPolisi') {
                     $val = strtoupper(str_replace(' ', '', $val));
+                }
+                if ($f === 'block') {
+                    if (strlen($val) > 10) {
+                        $cleanB = trim(preg_replace('/^blok\s+/i', '', $val));
+                        $val = substr($cleanB, 0, 10);
+                    }
+                }
+                if ($f === 'slot') {
+                    $val = substr($val, 0, 5);
+                }
+                if ($f === 'tier') {
+                    $val = substr($val, 0, 5);
                 }
                 $clean[$f] = $val;
             }
@@ -215,7 +228,8 @@ if ($action === 'send') {
                         }
 
                         $kegiatanLabel = getKegiatanLabel($itemClean['kodeKegiatan']);
-                        $deptTag = !empty($itemClean['departemen']) ? '[' . strtoupper(trim($itemClean['departemen'])) . '] ' : (!empty($postData['departemen']) ? '[' . strtoupper(trim($postData['departemen'])) . '] ' : '[TPP] ');
+                        $isGudangItem = (isset($itemClean['kodeGudang']) && strtoupper(trim($itemClean['kodeGudang'])) === 'GPSU') || (!empty($itemClean['departemen']) && strtoupper(trim($itemClean['departemen'])) === 'GUDANG') || (!empty($postData['departemen']) && strtoupper(trim($postData['departemen'])) === 'GUDANG');
+                        $deptTag = $isGudangItem ? '[GUDANG] ' : '[TPP] ';
 
                         $stmtTrack->execute([
                             $itemClean['nomorKontainer'],
@@ -493,6 +507,14 @@ if ($action === 'history' || $action === 'report') {
             $params[':keg2'] = "%Kegiatan $kegiatan:%";
         }
 
+        // Filter Departemen Operasional (TPP vs GUDANG)
+        $deptParam = strtolower(trim((string)input('dept', input('kodeGudang', ''))));
+        if ($deptParam === 'tpp' || $deptParam === 'cpsu') {
+            $where[] = "(raw_data LIKE '%\"kodeGudang\"%\"CPSU\"%' OR keterangan LIKE '%[TPP]%' OR (raw_data NOT LIKE '%\"kodeGudang\"%\"GPSU\"%' AND keterangan NOT LIKE '%[GUDANG]%'))";
+        } elseif ($deptParam === 'gudang' || $deptParam === 'gpsu') {
+            $where[] = "(raw_data LIKE '%\"kodeGudang\"%\"GPSU\"%' OR keterangan LIKE '%[GUDANG]%')";
+        }
+
         if (!empty($q)) {
             $where[] = "(no_cont LIKE :q OR no_bl_awb LIKE :q2 OR keterangan LIKE :q3)";
             $params[':q'] = "%$q%";
@@ -521,7 +543,16 @@ if ($action === 'history' || $action === 'report') {
         $rawRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $rows = [];
-        $summary = ['total' => count($rawRows), 'gate_in' => 0, 'gate_out' => 0, 'stacking' => 0, 'other' => 0, 'today' => 0];
+        $summary = [
+            'total'    => count($rawRows),
+            'tpp'      => 0,
+            'gudang'   => 0,
+            'gate_in'  => 0,
+            'gate_out' => 0,
+            'stacking' => 0,
+            'other'    => 0,
+            'today'    => 0
+        ];
         $todayStr = date('d-m-Y');
 
         foreach ($rawRows as $r) {
@@ -529,6 +560,18 @@ if ($action === 'history' || $action === 'report') {
             $payload = $rawParsed['payload'] ?? [];
             $response = $rawParsed['response'] ?? [];
             $batchId = $rawParsed['batch_id'] ?? '-';
+
+            // Identifikasi Departemen (TPP vs GUDANG)
+            $kg = strtoupper(trim((string)($payload['kodeGudang'] ?? '')));
+            if ($kg === 'GPSU' || stripos($r['keterangan'], '[GUDANG]') !== false) {
+                $deptName = 'GUDANG';
+                $kodeGud = 'GPSU';
+                $summary['gudang']++;
+            } else {
+                $deptName = 'TPP';
+                $kodeGud = 'CPSU';
+                $summary['tpp']++;
+            }
 
             $st = strtoupper($r['status_tracking'] . ' ' . $r['keterangan']);
             if (strpos($st, 'GATE IN') !== false) { $summary['gate_in']++; $cat = 'GATE_IN'; }
@@ -554,6 +597,8 @@ if ($action === 'history' || $action === 'report') {
                 'waktu_status'    => $r['waktu_status'],
                 'keterangan'      => $r['keterangan'],
                 'created_at'      => $r['created_at'],
+                'dept'            => $deptName,
+                'kode_gudang'     => $kodeGud,
                 'category'        => $cat,
                 'batch_id'        => $batchId,
                 'ukuran'          => ($payload['ukuranKontainer'] ?? '40') . ' ft',

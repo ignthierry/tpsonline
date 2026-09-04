@@ -207,6 +207,39 @@ $defaultRef = 'YOR-PSU0-' . date('ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0',
             border: 1px solid rgba(59, 130, 246, 0.25);
             color: #93c5fd;
         }
+
+        /* Tombol Departemen Operasional Lini 2 */
+        .dept-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 18px;
+            border-radius: 10px;
+            border: 1px solid var(--border-medium);
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-align: left;
+            width: 100%;
+        }
+        .dept-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+            background: var(--bg-card);
+        }
+        .dept-btn.active.dept-tpp {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.25));
+            border-color: var(--accent-blue);
+            color: #60a5fa;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+        .dept-btn.active.dept-gudang {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.25));
+            border-color: #10b981;
+            color: #34d399;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
     </style>
 </head>
 <body data-login-time="<?= $loginTime ?>">
@@ -276,12 +309,40 @@ $defaultRef = 'YOR-PSU0-' . date('ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0',
 
                         <!-- KOLOM KIRI: FORMULIR YOR (KHUSUS IMPOR) -->
                         <div>
+                            <!-- 0. Toggle Departemen Operasional Lini 2 -->
+                            <div class="yor-card" style="padding: 16px 20px; margin-bottom: 20px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                                    <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                                        🏬 Departemen Operasional Lini 2
+                                    </span>
+                                    <span id="dept-database-badge" style="font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-family: 'JetBrains Mono', monospace; background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); border: 1px solid rgba(59, 130, 246, 0.3);">
+                                        DB: tpp_primamas (PLP FCL)
+                                    </span>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                    <button type="button" id="btn-dept-tpp" class="dept-btn active dept-tpp" onclick="setYorDepartment('tpp')">
+                                        <span style="font-size: 1.15rem;">🏢</span>
+                                        <div>
+                                            <strong style="display: block; font-size: 0.95rem;">TPP (PLP / Lapangan)</strong>
+                                            <small style="opacity: 0.8; font-size: 0.75rem;">Kode Gudang: CPSU • Kapasitas: 1.090 TEUs</small>
+                                        </div>
+                                    </button>
+                                    <button type="button" id="btn-dept-gudang" class="dept-btn" onclick="setYorDepartment('gudang')">
+                                        <span style="font-size: 1.15rem;">🏬</span>
+                                        <div>
+                                            <strong style="display: block; font-size: 0.95rem;">Gudang (LCL / CFS)</strong>
+                                            <small style="opacity: 0.8; font-size: 0.75rem;">Kode Gudang: GPSU • Kapasitas: 14.196 M³</small>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
                             <!-- 1. Header Dokumen Laporan -->
                             <div class="yor-card">
                                 <div class="section-header-row">
                                     <span>📑 1. Identitas Dokumen & Lokasi TPS</span>
-                                    <button type="button" class="btn-auto-calc" onclick="fetchLiveDepoStock()" title="Tarik data riil kontainer dari database depo & Master Constanta">
-                                        <span>⚡</span> Tarik dari Master Constanta & Depo
+                                    <button type="button" id="btn-tarik-stok" class="btn-auto-calc" onclick="fetchLiveDepoStock()" title="Tarik data riil dari database & Master Constanta">
+                                        <span>⚡</span> <span id="lbl-btn-tarik">Tarik dari TPP & Master Constanta</span>
                                     </button>
                                 </div>
 
@@ -306,8 +367,8 @@ $defaultRef = 'YOR-PSU0-' . date('ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0',
                                     </div>
                                     <div class="field-group">
                                         <label for="kode-gudang">Kode Gudang <span class="req-star">*</span></label>
-                                        <input type="text" id="kode-gudang" class="input-control" value="CPSU" readonly title="Kode Gudang Baku: CPSU (Container Yard Lini 2)">
-                                        <span class="helper-text">CPSU (Container Yard TPS Lini 2)</span>
+                                        <input type="text" id="kode-gudang" class="input-control" value="CPSU" readonly title="Kode Gudang Baku (readonly)">
+                                        <span class="helper-text" id="kode-gudang-helper">CPSU (Container Yard TPS Lini 2)</span>
                                     </div>
                                 </div>
                             </div>
@@ -316,7 +377,7 @@ $defaultRef = 'YOR-PSU0-' . date('ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0',
                             <div class="yor-card">
                                 <div class="section-header-row">
                                     <div style="display: flex; align-items: center; gap: 10px;">
-                                        <span>📥 2. Data Penggunaan Lapangan (IMPOR)</span>
+                                        <span id="section-2-title"><span>📥</span> 2. Data Penggunaan Lapangan Penumpukan (IMPOR)</span>
                                         <span class="info-pill" title="TPS Primamas hanya melayani kegiatan Impor">Kegiatan Ekspor Nihil</span>
                                     </div>
                                     <span class="yor-stat-badge" id="badge-yor-impor">YOR: 0.00%</span>
@@ -325,13 +386,13 @@ $defaultRef = 'YOR-PSU0-' . date('ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0',
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
                                     <div class="field-group">
                                         <label for="impor-kap-lap">Kapasitas Lapangan (TEUs) <span class="req-star">*</span></label>
-                                        <input type="number" id="impor-kap-lap" class="input-control" value="1090" step="any" min="1" oninput="calcYor()">
-                                        <span class="helper-text">Acuan Master_Constanta (tppconstanta.YOR = 1090 TEUs)</span>
+                                        <input type="number" id="impor-kap-lap" class="input-control" value="1090" step="any" min="0" oninput="calcYor()">
+                                        <span class="helper-text" id="helper-kap-lap">Acuan Master_Constanta (tppconstanta.YOR = 1090 TEUs)</span>
                                     </div>
                                     <div class="field-group">
                                         <label for="impor-kap-gud">Kapasitas Gudang (m² / Ton) <span class="req-star">*</span></label>
-                                        <input type="number" id="impor-kap-gud" class="input-control" value="0" readonly title="Untuk kode CPSU bernilai 0 karena merupakan Container Yard (bukan gudang)">
-                                        <span class="helper-text" style="color:#10b981;">✓ Kode CPSU = 0 (Container Yard / Lapangan, bukan Gudang)</span>
+                                        <input type="number" id="impor-kap-gud" class="input-control" value="0" step="any" min="0" oninput="calcYor()">
+                                        <span class="helper-text" id="helper-kap-gud" style="color:#10b981;">✓ Kode CPSU = 0 (Container Yard / Lapangan, bukan Gudang)</span>
                                     </div>
                                 </div>
 
@@ -361,13 +422,13 @@ $defaultRef = 'YOR-PSU0-' . date('ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0',
                                     </div>
                                     <div class="field-group">
                                         <label for="impor-kemasan">Total Kemasan <span class="req-star">*</span></label>
-                                        <input type="number" id="impor-kemasan" class="input-control" value="0" readonly title="Untuk kode CPSU bernilai 0 karena tidak ada kemasan di CY">
-                                        <span class="helper-text" style="color:#10b981;">✓ Kode CPSU = 0 (Tidak ada kemasan di CY)</span>
+                                        <input type="number" id="impor-kemasan" class="input-control" value="0" min="0" oninput="calcYor()">
+                                        <span class="helper-text" id="helper-kemasan" style="color:#10b981;">✓ Kode CPSU = 0 (Tidak ada kemasan di CY)</span>
                                     </div>
                                     <div class="field-group">
-                                        <label for="impor-yor">Persentase YOR (%) <span class="req-star">*</span></label>
+                                        <label for="impor-yor">Persentase YOR / SOR (%) <span class="req-star">*</span></label>
                                         <input type="number" id="impor-yor" class="input-control" value="0" step="any" oninput="updateJsonPreview()">
-                                        <span class="helper-text">Formula RPLP_YOR: Presisi Float Penuh (tanpa pembulatan)</span>
+                                        <span class="helper-text" id="helper-yor-desc">Formula RPLP_YOR: Presisi Float Penuh (tanpa pembulatan)</span>
                                     </div>
                                 </div>
                             </div>
@@ -464,25 +525,127 @@ $defaultRef = 'YOR-PSU0-' . date('ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0',
             } catch(e) { showToast('Koneksi auth error: ' + e.message, 'error'); }
         }
 
-        function calcYor() {
-            const c20 = parseInt(document.getElementById('impor-c20').value || 0, 10);
-            const c40 = parseInt(document.getElementById('impor-c40').value || 0, 10);
-            const c45 = parseInt(document.getElementById('impor-c45').value || 0, 10);
-            const totalCont = c20 + c40 + c45;
-            document.getElementById('impor-total-cont').value = totalCont;
+        let currentDept = 'tpp';
+        let currentStockData = null;
 
-            const kapLap = parseFloat(document.getElementById('impor-kap-lap').value || 1090);
-            // Formula baku TEUs dari M_beranda: 20f = 1 TEU, 40f = 2 TEU, 45f = 2 TEU
-            const teus = (c20 * 1) + (c40 * 2) + (c45 * 2);
-            document.getElementById('txt-teus-info').textContent = `Total TEUs: ${teus}`;
+        function setYorDepartment(dept) {
+            currentDept = dept;
+            const btnTpp = document.getElementById('btn-dept-tpp');
+            const btnGudang = document.getElementById('btn-dept-gudang');
+            const badge = document.getElementById('dept-database-badge');
+
+            if (dept === 'gudang') {
+                btnTpp.className = 'dept-btn';
+                btnGudang.className = 'dept-btn active dept-gudang';
+                badge.innerHTML = 'DB: primamas (Gudang LCL)';
+                badge.style.background = 'rgba(16, 185, 129, 0.15)';
+                badge.style.color = '#10b981';
+                badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+
+                $('#kode-gudang').val('GPSU');
+                $('#kode-gudang-helper').text('GPSU (Gudang CFS TPS Lini 2)');
+                $('#lbl-btn-tarik').text('Tarik dari Gudang LCL (primamas)');
+
+                $('#section-2-title').html('<span>🏬</span> 2. Data Penggunaan Gudang CFS & Kargo LCL (IMPOR)');
+                
+                // Set Kapasitas Lapangan = 0 (Gudang tertutup, bukan CY)
+                $('#impor-kap-lap').val(0).prop('readonly', true).css('background', 'rgba(0,0,0,0.12)');
+                $('#helper-kap-lap').html('<span style="color:#10b981;">✓ Kode GPSU = 0 (Gudang Tertutup CFS, bukan Lapangan Terbuka)</span>');
+
+                // Set Kapasitas Gudang = 14196 (M3) dari Beranda.php (Luas 2.366 m2 x Tinggi 6m)
+                $('#impor-kap-gud').val(14196).prop('readonly', false).css('background', 'var(--bg-input)');
+                $('#helper-kap-gud').html('Acuan Gudang LCL: Luas 2.366 m² × Tinggi Max 6 m = <b>14.196 M³</b>');
+
+                // Gudang adalah fasilitas kemasan, seluruh kontainer diset 0 & readonly
+                $('#impor-c20').val(0).prop('readonly', true).css('background', 'rgba(0,0,0,0.12)');
+                $('#impor-c40').val(0).prop('readonly', true).css('background', 'rgba(0,0,0,0.12)');
+                $('#impor-c45').val(0).prop('readonly', true).css('background', 'rgba(0,0,0,0.12)');
+                $('#impor-total-cont').val(0);
+                $('#txt-teus-info').text('Total Kontainer: 0 Box (Gudang CFS Khusus Kemasan LCL)');
+
+                // Kemasan Aktif
+                $('#impor-kemasan').prop('readonly', false).css('background', 'var(--bg-input)');
+                $('#helper-kemasan').html('Stok koli kemasan aktif di gudang (database primamas)');
+                $('#helper-yor-desc').text('Formula SOR: (Volume Kargo / 14.196 M³) × 100%');
+
+                showToast('Departemen Gudang (GPSU / database primamas) aktif — Mode Kemasan', 'info');
+            } else {
+                btnGudang.className = 'dept-btn';
+                btnTpp.className = 'dept-btn active dept-tpp';
+                badge.innerHTML = 'DB: tpp_primamas (PLP FCL)';
+                badge.style.background = 'rgba(59, 130, 246, 0.15)';
+                badge.style.color = 'var(--accent-blue)';
+                badge.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+
+                $('#kode-gudang').val('CPSU');
+                $('#kode-gudang-helper').text('CPSU (Container Yard TPS Lini 2)');
+                $('#lbl-btn-tarik').text('Tarik dari TPP & Master Constanta');
+
+                $('#section-2-title').html('<span>📥</span> 2. Data Penggunaan Lapangan Penumpukan (IMPOR)');
+
+                // Set Kapasitas Lapangan = 1090
+                $('#impor-kap-lap').val(1090).prop('readonly', false).css('background', 'var(--bg-input)');
+                $('#helper-kap-lap').html('Acuan Master_Constanta (tppconstanta.YOR = 1090 TEUs)');
+
+                // Kontainer Aktif untuk TPP Lapangan
+                $('#impor-c20').prop('readonly', false).css('background', 'var(--bg-input)');
+                $('#impor-c40').prop('readonly', false).css('background', 'var(--bg-input)');
+                $('#impor-c45').prop('readonly', false).css('background', 'var(--bg-input)');
+
+                // Set Kapasitas Gudang = 0
+                $('#impor-kap-gud').val(0).prop('readonly', true).css('background', 'rgba(0,0,0,0.12)');
+                $('#helper-kap-gud').html('<span style="color:#10b981;">✓ Kode CPSU = 0 (Container Yard / Lapangan, bukan Gudang)</span>');
+
+                // Kemasan 0
+                $('#impor-kemasan').val(0).prop('readonly', true).css('background', 'rgba(0,0,0,0.12)');
+                $('#helper-kemasan').html('<span style="color:#10b981;">✓ Kode CPSU = 0 (Tidak ada kemasan di CY)</span>');
+                $('#helper-yor-desc').text('Formula YOR: (Total TEUs / Kapasitas Lapangan) × 100%');
+
+                showToast('Departemen TPP (CPSU / database tpp_primamas) aktif — Mode Lapangan Kontainer', 'info');
+            }
+
+            fetchLiveDepoStock(false);
+        }
+
+        function calcYor() {
+            const isCPSU = ($('#kode-gudang').val() || '').trim().toUpperCase() === 'CPSU';
 
             let yorVal = 0;
-            if (kapLap > 0) {
-                // Sesuai RPLP_YOR & format response CEISA: tidak dibulatkan (full floating precision)
-                yorVal = (teus / kapLap) * 100;
+            if (isCPSU) {
+                const c20 = parseInt(document.getElementById('impor-c20').value || 0, 10);
+                const c40 = parseInt(document.getElementById('impor-c40').value || 0, 10);
+                const c45 = parseInt(document.getElementById('impor-c45').value || 0, 10);
+                const totalCont = c20 + c40 + c45;
+                document.getElementById('impor-total-cont').value = totalCont;
+
+                const teus = (c20 * 1) + (c40 * 2) + (c45 * 2);
+                document.getElementById('txt-teus-info').textContent = `Total TEUs: ${teus}`;
+
+                const kapLap = parseFloat(document.getElementById('impor-kap-lap').value || 1090);
+                if (kapLap > 0) {
+                    yorVal = (teus / kapLap) * 100;
+                }
+                document.getElementById('badge-yor-impor').textContent = `YOR: ${yorVal.toFixed(2)}%`;
+            } else {
+                // Untuk Gudang (SOR): Khusus kemasan/kargo, kontainer = 0
+                document.getElementById('impor-c20').value = 0;
+                document.getElementById('impor-c40').value = 0;
+                document.getElementById('impor-c45').value = 0;
+                document.getElementById('impor-total-cont').value = 0;
+                document.getElementById('txt-teus-info').textContent = `Total Kontainer: 0 Box (Gudang CFS Khusus Kemasan LCL)`;
+
+                // Rasio okupansi volume gudang (Kapasitas: 14.196 M3)
+                const kapGud = parseFloat(document.getElementById('impor-kap-gud').value || 14196);
+                if (currentStockData && currentStockData.totalVolume && kapGud > 0) {
+                    yorVal = (currentStockData.totalVolume / kapGud) * 100;
+                } else if (kapGud > 0) {
+                    const totalKms = parseFloat(document.getElementById('impor-kemasan').value || 0);
+                    yorVal = ((totalKms * 0.384) / kapGud) * 100;
+                }
+                document.getElementById('badge-yor-impor').textContent = `SOR: ${yorVal.toFixed(2)}%`;
             }
+
             document.getElementById('impor-yor').value = yorVal;
-            document.getElementById('badge-yor-impor').textContent = `YOR: ${yorVal.toFixed(2)}%`;
             document.getElementById('badge-yor-impor').title = `Nilai Riil Floating Point: ${yorVal}%`;
 
             updateJsonPreview();
@@ -492,14 +655,14 @@ $defaultRef = 'YOR-PSU0-' . date('ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0',
             const isCPSU = ($('#kode-gudang').val() || '').trim().toUpperCase() === 'CPSU';
 
             const impor = {
-                jumlahKontainer20f: parseInt($('#impor-c20').val() || 0, 10),
-                jumlahKontainer40f: parseInt($('#impor-c40').val() || 0, 10),
-                jumlahKontainer45f: parseInt($('#impor-c45').val() || 0, 10),
+                jumlahKontainer20f: isCPSU ? parseInt($('#impor-c20').val() || 0, 10) : 0,
+                jumlahKontainer40f: isCPSU ? parseInt($('#impor-c40').val() || 0, 10) : 0,
+                jumlahKontainer45f: isCPSU ? parseInt($('#impor-c45').val() || 0, 10) : 0,
                 kapasitasGudang: isCPSU ? 0 : parseFloat($('#impor-kap-gud').val() || 0),
-                kapasitasLapangan: parseFloat($('#impor-kap-lap').val() || 0),
+                kapasitasLapangan: isCPSU ? parseFloat($('#impor-kap-lap').val() || 0) : 0,
                 totalKemasan: isCPSU ? 0 : parseFloat($('#impor-kemasan').val() || 0),
-                totalKontainer: parseInt($('#impor-total-cont').val() || 0, 10),
-                yor: parseFloat($('#impor-yor').val() || 0) // float murni tanpa pembulatan
+                totalKontainer: isCPSU ? parseInt($('#impor-total-cont').val() || 0, 10) : 0,
+                yor: parseFloat($('#impor-yor').val() || 0)
             };
 
             // Karena TPS Primamas hanya melayani Impor, seluruh objek ekspor diset 0
@@ -544,25 +707,49 @@ $defaultRef = 'YOR-PSU0-' . date('ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0',
         }
 
         async function fetchLiveDepoStock(notify = true) {
-            if (notify) showToast('Menghubungkan ke Master Constanta & database depo...', 'info');
+            const isCPSU = ($('#kode-gudang').val() || '').trim().toUpperCase() === 'CPSU';
+            const dept = isCPSU ? 'tpp' : 'gudang';
+            const kodeGudang = isCPSU ? 'CPSU' : 'GPSU';
+
+            if (notify) showToast(`Menghubungkan ke database ${isCPSU ? 'TPP (tpp_primamas)' : 'Gudang (primamas)'}...`, 'info');
             try {
                 const tgl = ($('#tgl-laporan').val() || '').trim();
-                const res = await fetch(`api/laporan_yor.php?action=fetch_stock&tanggalLaporan=${encodeURIComponent(tgl)}&kodeGudang=CPSU`);
+                const res = await fetch(`api/laporan_yor.php?action=fetch_stock&tanggalLaporan=${encodeURIComponent(tgl)}&dept=${dept}&kodeGudang=${kodeGudang}`);
                 const data = await res.json();
                 if (data.success && data.stock) {
                     const st = data.stock.impor || {};
-                    if (st.kapasitasLapangan) $('#impor-kap-lap').val(st.kapasitasLapangan);
-                    $('#impor-kap-gud').val(0); // CPSU adalah CY, bukan gudang
-                    $('#impor-c20').val(st.c20 || 0);
-                    $('#impor-c40').val(st.c40 || 0);
-                    $('#impor-c45').val(st.c45 || 0);
-                    $('#impor-kemasan').val(0); // CPSU tidak ada kemasan
+                    currentStockData = st;
+
+                    if (isCPSU) {
+                        if (st.kapasitasLapangan) $('#impor-kap-lap').val(st.kapasitasLapangan);
+                        $('#impor-kap-gud').val(0);
+                        $('#impor-c20').val(st.c20 || 0);
+                        $('#impor-c40').val(st.c40 || 0);
+                        $('#impor-c45').val(st.c45 || 0);
+                        $('#impor-kemasan').val(0);
+                        if (st.yor !== undefined) $('#impor-yor').val(st.yor);
+                    } else {
+                        $('#impor-kap-lap').val(0);
+                        if (st.kapasitasGudang) $('#impor-kap-gud').val(st.kapasitasGudang);
+                        $('#impor-c20').val(0);
+                        $('#impor-c40').val(0);
+                        $('#impor-c45').val(0);
+                        $('#impor-total-cont').val(0);
+                        $('#impor-kemasan').val(st.totalKemasan || 0);
+                        if (st.yor !== undefined) $('#impor-yor').val(st.yor);
+                    }
+
                     calcYor();
+
                     if (notify) {
-                        showToast(`Data Master Constanta & Depo termuat: ${st.total || 0} box (${st.teus || 0} TEUs), Kapasitas: ${st.kapasitasLapangan || 1090} TEUs!`, 'success');
+                        if (isCPSU) {
+                            showToast(`Stok Depo TPP termuat: ${st.total || 0} box (${st.teus || 0} TEUs), Kapasitas Lapangan: ${st.kapasitasLapangan || 1090} TEUs!`, 'success');
+                        } else {
+                            showToast(`Stok Gudang CFS termuat: ${st.totalKemasan || 0} kemasan (${(st.totalVolume || 0).toFixed(2)} M³), Kapasitas: ${st.kapasitasGudang || 14196} M³!`, 'success');
+                        }
                     }
                 } else if (notify) {
-                    showToast('Gagal menarik stok depo: ' + (data.message || 'Error'), 'error');
+                    showToast('Gagal menarik data: ' + (data.message || 'Error'), 'error');
                 }
             } catch(e) {
                 if (notify) showToast('Kesalahan koneksi database: ' + e.message, 'error');

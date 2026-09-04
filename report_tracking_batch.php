@@ -434,15 +434,24 @@ $firstDayOfMonth = date('Y-m-01');
                         </div>
 
                         <form id="filter-form" onsubmit="event.preventDefault(); loadReportData(true);">
-                            <div class="filter-grid">
+                            <div class="filter-grid" style="grid-template-columns: 1fr 1fr 1.2fr auto;">
                                 <div class="input-group">
                                     <label for="tgl-awal">Tanggal Awal</label>
-                                    <input type="date" id="tgl-awal" class="input-control" value="<?= e($firstDayOfMonth) ?>" required>
+                                    <input type="date" id="tgl-awal" class="input-control" value="<?= e($firstDayOfMonth) ?>" required onchange="loadReportData(false)">
                                 </div>
 
                                 <div class="input-group">
                                     <label for="tgl-akhir">Tanggal Akhir</label>
-                                    <input type="date" id="tgl-akhir" class="input-control" value="<?= e($todayDate) ?>" required>
+                                    <input type="date" id="tgl-akhir" class="input-control" value="<?= e($todayDate) ?>" required onchange="loadReportData(false)">
+                                </div>
+
+                                <div class="input-group">
+                                    <label for="filter-dept">Departemen Operasional</label>
+                                    <select id="filter-dept" class="input-control" onchange="loadReportData(false)">
+                                        <option value="">Semua Departemen (TPP & Gudang)</option>
+                                        <option value="tpp">🏢 TPP (CPSU - PLP FCL)</option>
+                                        <option value="gudang">🏬 Gudang (GPSU - CFS LCL)</option>
+                                    </select>
                                 </div>
 
                                 <div style="display:flex; align-items:center; height:42px; margin-bottom:2px;">
@@ -455,18 +464,26 @@ $firstDayOfMonth = date('Y-m-01');
                     </div>
 
                     <!-- Stats Bar -->
-                    <div class="stats-bar" id="stats-bar" style="display:none;">
+                    <div class="stats-bar" id="stats-bar" style="display:none; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
                         <div class="stat-item">
                             <span class="stat-label">Total Data Terkirim</span>
                             <span class="stat-value" id="stat-count" style="color:#10b981;">0 Kontainer</span>
                         </div>
                         <div class="stat-item">
+                            <span class="stat-label">🏢 TPP (CPSU)</span>
+                            <span class="stat-value" id="stat-tpp" style="color:#60a5fa; font-size:1.4rem;">0 Box</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">🏬 Gudang (GPSU)</span>
+                            <span class="stat-value" id="stat-gudang" style="color:#10b981; font-size:1.4rem;">0 Box</span>
+                        </div>
+                        <div class="stat-item">
                             <span class="stat-label">Layanan / Endpoint</span>
-                            <span class="stat-value" id="stat-service" style="color:#38bdf8; font-size:1.15rem; font-family:'JetBrains Mono',monospace;">tps-tracking/batch</span>
+                            <span class="stat-value" id="stat-service" style="color:#38bdf8; font-size:1.1rem; font-family:'JetBrains Mono',monospace;">tps-tracking/batch</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Rentang Waktu</span>
-                            <span class="stat-value" id="stat-range" style="color:#a78bfa; font-size:1.15rem; font-family:'JetBrains Mono',monospace;">-</span>
+                            <span class="stat-value" id="stat-range" style="color:#a78bfa; font-size:1.1rem; font-family:'JetBrains Mono',monospace;">-</span>
                         </div>
                     </div>
 
@@ -486,7 +503,7 @@ $firstDayOfMonth = date('Y-m-01');
                         <div class="tab-content active" id="tab-table">
                             <div style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                                 <div style="font-size:0.88rem; color:var(--text-secondary);">
-                                    <span>Tabel Interaktif Pengiriman TPS Tracking Kontainer (Sorting, Filter & Pagination DataTables aktif)</span>
+                                    <span>Tabel Interaktif Pengiriman TPS Tracking Kontainer Batch (Sorting, Filter & Pagination DataTables aktif)</span>
                                 </div>
                                 <button type="button" class="btn-view-raw-json" onclick="switchTab('tab-json', document.querySelectorAll('.tab-btn')[1])" title="Buka respon lengkap JSON dari Gateway CEISA 4.0">
                                     <span class="icon-badge">⚡</span>
@@ -500,6 +517,7 @@ $firstDayOfMonth = date('Y-m-01');
                                         <tr>
                                             <th style="width:50px; text-align:center;">No</th>
                                             <th>Nomor Kontainer</th>
+                                            <th>Departemen</th>
                                             <th>Kegiatan & Status CEISA</th>
                                             <th>Waktu Kegiatan</th>
                                             <th>No. B/L / AWB</th>
@@ -702,6 +720,7 @@ $firstDayOfMonth = date('Y-m-01');
         function loadReportData(showNotification = true) {
             const tglAwal = $('#tgl-awal').val();
             const tglAkhir = $('#tgl-akhir').val();
+            const dept = $('#filter-dept').val() || '';
 
             if (!tglAwal || !tglAkhir) return;
 
@@ -718,13 +737,15 @@ $firstDayOfMonth = date('Y-m-01');
                 data: {
                     action: 'report',
                     tanggalAwal: tglAwal,
-                    tanggalAkhir: tglAkhir
+                    tanggalAkhir: tglAkhir,
+                    dept: dept
                 },
                 dataType: 'json',
                 success: function(result) {
                     rawApiResponse = result;
                     cachedRows = result.rows || [];
                     const count = cachedRows.length;
+                    const summary = result.summary || {};
 
                     if (!result.success || count === 0) {
                         $('#auto-sync-status').html('ℹ️ <span style="color:var(--text-secondary);">Tidak ada data</span>');
@@ -747,6 +768,8 @@ $firstDayOfMonth = date('Y-m-01');
                     $('#result-card').show();
 
                     $('#stat-count').text(count + ' Kontainer');
+                    $('#stat-tpp').text((summary.tpp || 0) + ' Box');
+                    $('#stat-gudang').text((summary.gudang || 0) + ' Box');
                     $('#tab-count').text(count);
                     $('#stat-service').text('tps-tracking/batch');
                     $('#stat-range').text(`${tglAwal} s/d ${tglAkhir}`);
@@ -782,6 +805,11 @@ $firstDayOfMonth = date('Y-m-01');
             tbody.innerHTML = '';
 
             rows.forEach((r, idx) => {
+                const isGudang = (r.dept === 'GUDANG' || r.kode_gudang === 'GPSU');
+                const deptBadge = isGudang
+                    ? `<span class="badge-pill" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); font-weight:700; font-size:11px;">🏬 GUDANG (GPSU)</span>`
+                    : `<span class="badge-pill" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3); font-weight:700; font-size:11px;">🏢 TPP (CPSU)</span>`;
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td style="text-align:center;">${idx + 1}</td>
@@ -792,6 +820,7 @@ $firstDayOfMonth = date('Y-m-01');
                             <button type="button" class="btn-copy-ref" onclick="copyText('${r.no_cont}')" title="Salin No Kontainer">📋</button>
                         </span>
                     </td>
+                    <td>${deptBadge}</td>
                     <td><span class="badge-pill" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); font-size:11px;">${r.status_tracking || '-'}</span></td>
                     <td><span style="font-family:'JetBrains Mono',monospace; font-size:0.85rem;">${r.waktu_status || '-'}</span></td>
                     <td>
@@ -873,7 +902,10 @@ $firstDayOfMonth = date('Y-m-01');
 
                     $('#modal-ref-number').text(data.no_cont || payload.nomorKontainer || '-');
                     $('#modal-bc11').text(payload.nomorDokumen ? (payload.kodeDokumen || '20') + ' / ' + payload.nomorDokumen + (payload.tanggalDokumen ? ' (' + payload.tanggalDokumen + ')' : '') : '-');
-                    $('#modal-gudang').text((payload.kodeGudang || 'CPSU') + ' / ' + (payload.kodeTps || 'PSU0'));
+
+                    const kg = (payload.kodeGudang || (data.keterangan && data.keterangan.includes('[GUDANG]') ? 'GPSU' : 'CPSU')).toUpperCase();
+                    const deptDesc = (kg === 'GPSU') ? '🏬 Gudang CFS (GPSU)' : '🏢 TPP Lapangan (CPSU)';
+                    $('#modal-gudang').html(`<b>${deptDesc}</b> <small style="color:var(--text-secondary);">/ ${payload.kodeTps || 'PSU0'}</small>`);
                     $('#modal-waktu-kegiatan').text(payload.waktuKegiatan || data.waktu_status || '-');
                     $('#modal-waktu-kirim').text(response.waktuRekam || data.created_at || '-');
 

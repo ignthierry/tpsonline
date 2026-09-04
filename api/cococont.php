@@ -164,9 +164,19 @@ function handleFetch() {
                     INNER JOIN tpp_primamas.tppcontplp ON (tppcontplp.idPLP_FK = tppmanifestplp.idPLP AND tppcontplp.flag = 1)
                     INNER JOIN tpp_primamas.tppconsignee ON tppconsignee.Id_Cons = tppcontplp.idCons_FK
                     INNER JOIN primamas.tpsws_responplp_header_backup H ON (H.NO_SURAT = tppmanifestplp.noPLP AND H.NO_PLP = tppcontplp.noEIR)
-                    INNER JOIN primamas.tpsws_responplp_detail_backup D ON (H.NO_SURAT = D.NO_SURAT_FK AND D.NO_PLP_FK = H.NO_PLP AND D.NO_CONT = tppcontplp.noCont)
+                    LEFT JOIN primamas.tpsws_responplp_detail_backup D ON (
+                        H.NO_SURAT = D.NO_SURAT_FK 
+                        AND D.NO_PLP_FK = H.NO_PLP 
+                        AND D.NO_CONT = tppcontplp.noCont
+                        AND (
+                            (tppcontplp.NO_MASTER_BL_AWB IS NOT NULL AND tppcontplp.NO_MASTER_BL_AWB != '' AND D.NO_BL_AWB = tppcontplp.NO_MASTER_BL_AWB)
+                            OR (tppcontplp.NoPosBC11 IS NOT NULL AND tppcontplp.NoPosBC11 != '' AND D.NO_POS_BC11 LIKE CONCAT(tppcontplp.NoPosBC11, '%'))
+                            OR ((tppcontplp.NO_MASTER_BL_AWB IS NULL OR tppcontplp.NO_MASTER_BL_AWB = '') AND (tppcontplp.NoPosBC11 IS NULL OR tppcontplp.NoPosBC11 = ''))
+                        )
+                    )
                 WHERE tppmanifestplp.flag = 1
                     AND DATE(tppcontplp.tglInDepo) BETWEEN :tglAwal AND :tglAkhir
+                GROUP BY tppcontplp.idCont
                 ORDER BY tppmanifestplp.idPLP";
         $stmt = $pdo_tpp->prepare($sql);
         $stmt->execute([':tglAwal' => $tglAwal, ':tglAkhir' => $tglAkhir]);
@@ -222,10 +232,19 @@ function handleFetch() {
                     INNER JOIN tpp_primamas.tppinvoiceplp ON tppinvcontplp.idInvPLP = tppinvoiceplp.idInvPLP AND tppinvoiceplp.invType = 'penumpukanPLP'
                     INNER JOIN tpp_primamas.tppsuratjalan ON tppsuratjalan.idManifest = tppcontplp.idCont AND tppsuratjalan.typeManifest = 'PLP' 
                     INNER JOIN tpp_primamas.tppconsignee ON tppconsignee.Id_Cons = tppcontplp.idCons_FK
-                    LEFT JOIN primamas.tpsws_responplp_detail_backup D ON (D.NO_CONT = tppcontplp.noCont AND D.NO_SURAT_FK = tppmanifestplp.noPLP)
+                    LEFT JOIN primamas.tpsws_responplp_detail_backup D ON (
+                        D.NO_CONT = tppcontplp.noCont 
+                        AND D.NO_SURAT_FK = tppmanifestplp.noPLP
+                        AND (
+                            (tppcontplp.NO_MASTER_BL_AWB IS NOT NULL AND tppcontplp.NO_MASTER_BL_AWB != '' AND D.NO_BL_AWB = tppcontplp.NO_MASTER_BL_AWB)
+                            OR (tppcontplp.NoPosBC11 IS NOT NULL AND tppcontplp.NoPosBC11 != '' AND D.NO_POS_BC11 LIKE CONCAT(tppcontplp.NoPosBC11, '%'))
+                            OR ((tppcontplp.NO_MASTER_BL_AWB IS NULL OR tppcontplp.NO_MASTER_BL_AWB = '') AND (tppcontplp.NoPosBC11 IS NULL OR tppcontplp.NoPosBC11 = ''))
+                        )
+                    )
                     LEFT JOIN primamas.tpsws_responplp_header_backup H ON (H.NO_SURAT = D.NO_SURAT_FK AND tppcontplp.noEIR = H.NO_PLP AND tppcontplp.tglEIR = H.TGL_PLP)
                 WHERE tppmanifestplp.flag = 1
                     AND DATE(tppsuratjalan.cetak) BETWEEN :tglAwal1 AND :tglAkhir1
+                GROUP BY tppcontplp.idCont
                 )
                 UNION
                 (SELECT 
@@ -275,10 +294,19 @@ function handleFetch() {
                     INNER JOIN tpp_primamas.tppcontplp ON (tppcontplp.idPLP_FK = tppmanifestplp.idPLP AND tppcontplp.flag = 1)
                     LEFT JOIN tpp_primamas.tppjobplp ON tppjobplp.idCont_FK = tppcontplp.idCont AND tppjobplp.jobType = 'Job TPSTPP'
                     INNER JOIN tpp_primamas.tppconsignee ON tppconsignee.Id_Cons = tppcontplp.idCons_FK
-                    LEFT JOIN primamas.tpsws_responplp_detail_backup D ON (D.NO_CONT = tppcontplp.noCont AND D.NO_SURAT_FK = tppmanifestplp.noPLP)
+                    LEFT JOIN primamas.tpsws_responplp_detail_backup D ON (
+                        D.NO_CONT = tppcontplp.noCont 
+                        AND D.NO_SURAT_FK = tppmanifestplp.noPLP
+                        AND (
+                            (tppcontplp.NO_MASTER_BL_AWB IS NOT NULL AND tppcontplp.NO_MASTER_BL_AWB != '' AND D.NO_BL_AWB = tppcontplp.NO_MASTER_BL_AWB)
+                            OR (tppcontplp.NoPosBC11 IS NOT NULL AND tppcontplp.NoPosBC11 != '' AND D.NO_POS_BC11 LIKE CONCAT(tppcontplp.NoPosBC11, '%'))
+                            OR ((tppcontplp.NO_MASTER_BL_AWB IS NULL OR tppcontplp.NO_MASTER_BL_AWB = '') AND (tppcontplp.NoPosBC11 IS NULL OR tppcontplp.NoPosBC11 = ''))
+                        )
+                    )
                     LEFT JOIN primamas.tpsws_responplp_header_backup H ON (H.NO_SURAT = D.NO_SURAT_FK AND tppcontplp.noEIR = H.NO_PLP AND tppcontplp.tglEIR = H.TGL_PLP)
                 WHERE tppmanifestplp.flag = 1
                     AND DATE(tppjobplp.tglJob) BETWEEN :tglAwal2 AND :tglAkhir2
+                GROUP BY tppcontplp.idCont
                 )";
         $stmt = $pdo_tpp->prepare($sql);
         $stmt->execute([

@@ -325,7 +325,7 @@ $firstDayOfMonth = date('Y-m-01');
                         </div>
 
                         <form id="filter-form" onsubmit="event.preventDefault(); loadReportData(true);">
-                            <div class="filter-grid">
+                            <div class="filter-grid" style="grid-template-columns: 1fr 1fr 1.2fr auto;">
                                 <div class="input-group">
                                     <label for="tgl-awal">Tanggal Awal</label>
                                     <input type="date" id="tgl-awal" class="input-control" value="<?= $firstDayOfMonth ?>" required onchange="loadReportData(false)">
@@ -333,6 +333,14 @@ $firstDayOfMonth = date('Y-m-01');
                                 <div class="input-group">
                                     <label for="tgl-akhir">Tanggal Akhir</label>
                                     <input type="date" id="tgl-akhir" class="input-control" value="<?= $todayDate ?>" required onchange="loadReportData(false)">
+                                </div>
+                                <div class="input-group">
+                                    <label for="filter-dept">Departemen Operasional</label>
+                                    <select id="filter-dept" class="input-control" onchange="loadReportData(false)">
+                                        <option value="">Semua Departemen (TPP & Gudang)</option>
+                                        <option value="tpp">🏢 TPP (CPSU - Lapangan FCL)</option>
+                                        <option value="gudang">🏬 Gudang (GPSU - CFS LCL Kemasan)</option>
+                                    </select>
                                 </div>
                                 <div style="display:flex; gap:10px;">
                                     <button type="submit" class="btn-action-sm" style="height:44px; padding:0 22px; font-weight:600; border-radius:8px; display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, #3b82f6, #2563eb); color:#fff; border:none; cursor:pointer;">
@@ -344,22 +352,26 @@ $firstDayOfMonth = date('Y-m-01');
                     </div>
 
                     <!-- Stats Row -->
-                    <div class="stats-bar" id="stats-bar" style="display:none;">
+                    <div class="stats-bar" id="stats-bar" style="display:none; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
                         <div class="stat-item">
-                            <span class="stat-label">Total Laporan YOR</span>
+                            <span class="stat-label">Total Laporan YOR/SOR</span>
                             <span class="stat-value" id="stat-total" style="color:var(--accent-blue);">0</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Rata-rata YOR Impor</span>
-                            <span class="stat-value" id="stat-avg-impor" style="color:#10b981;">0.00%</span>
+                            <span class="stat-label">🏢 Laporan TPP (CPSU)</span>
+                            <span class="stat-value" id="stat-tpp-count" style="color:#60a5fa; font-size:1.4rem;">0 Laporan</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Total Kontainer Impor</span>
-                            <span class="stat-value" id="stat-total-cont" style="color:#f59e0b;">0 Box</span>
+                            <span class="stat-label">🏬 Laporan Gudang (GPSU)</span>
+                            <span class="stat-value" id="stat-gudang-count" style="color:#10b981; font-size:1.4rem;">0 Laporan</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Kegiatan Ekspor</span>
-                            <span class="stat-value" style="color:var(--text-muted); font-size:1.3rem;">Nihil (0%)</span>
+                            <span class="stat-label">Rata-rata Okupansi Impor</span>
+                            <span class="stat-value" id="stat-avg-impor" style="color:#38bdf8; font-size:1.4rem;">0.00%</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Stok Kargo Terekam</span>
+                            <span class="stat-value" id="stat-stok-summary" style="color:#f59e0b; font-size:1.15rem; font-family:'JetBrains Mono',monospace;">0 Box / 0 Kms</span>
                         </div>
                     </div>
 
@@ -383,9 +395,9 @@ $firstDayOfMonth = date('Y-m-01');
                                             <th style="width:40px; text-align:center;">No</th>
                                             <th>Nomor Referensi (refNumber)</th>
                                             <th>Tanggal Laporan</th>
-                                            <th>YOR Impor (%)</th>
-                                            <th>Total Kontainer</th>
-                                            <th>TPS / Gudang</th>
+                                            <th>Departemen / Lokasi</th>
+                                            <th>Okupansi YOR / SOR</th>
+                                            <th>Stok Riil Impor</th>
                                             <th>Status Gateway</th>
                                             <th style="text-align:center; width:150px;">Aksi</th>
                                         </tr>
@@ -556,6 +568,7 @@ $firstDayOfMonth = date('Y-m-01');
         function loadReportData(showNotify = false) {
             const tglAwal = $('#tgl-awal').val();
             const tglAkhir = $('#tgl-akhir').val();
+            const dept = $('#filter-dept').val() || '';
 
             $.ajax({
                 url: 'api/laporan_yor.php',
@@ -563,7 +576,8 @@ $firstDayOfMonth = date('Y-m-01');
                 data: {
                     action: 'report',
                     start_date: tglAwal,
-                    end_date: tglAkhir
+                    end_date: tglAkhir,
+                    dept: dept
                 },
                 dataType: 'json',
                 success: function(res) {
@@ -575,9 +589,12 @@ $firstDayOfMonth = date('Y-m-01');
                     $('#result-card').show();
 
                     $('#stat-total').text(summary.total || 0);
+                    $('#stat-tpp-count').text((summary.tpp_count || 0) + ' Laporan');
+                    $('#stat-gudang-count').text((summary.gudang_count || 0) + ' Laporan');
                     $('#stat-avg-impor').text((summary.avg_impor || 0) + '%');
-                    $('#stat-avg-ekspor').text((summary.avg_ekspor || 0) + '%');
-                    $('#stat-total-cont').text((summary.total_kontainer || 0) + ' Box');
+                    const totCont = summary.total_kontainer || 0;
+                    const totKms = (summary.total_kemasan || 0).toLocaleString('id-ID');
+                    $('#stat-stok-summary').text(`${totCont} Box / ${totKms} Kms`);
                     $('#tab-count').text(cachedRows.length);
 
                     renderReportTable(cachedRows);
@@ -605,6 +622,20 @@ $firstDayOfMonth = date('Y-m-01');
             rows.forEach((r, idx) => {
                 const tr = document.createElement('tr');
                 const isOk = (r.status_kirim === 'SUCCESS');
+                const isGudang = (r.kode_gudang === 'GPSU');
+
+                const deptBadge = isGudang
+                    ? `<span class="badge-pill" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); font-weight:700; font-size:11px;">🏬 GUDANG (GPSU)</span>`
+                    : `<span class="badge-pill" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3); font-weight:700; font-size:11px;">🏢 TPP (CPSU)</span>`;
+
+                const yorBadge = isGudang
+                    ? `<span class="badge-pill" style="background:rgba(16,185,129,0.15); color:#10b981; font-weight:700; font-size:0.92rem;">SOR: ${r.impor_yor}%</span>`
+                    : `<span class="badge-pill" style="background:rgba(59,130,246,0.15); color:#60a5fa; font-weight:700; font-size:0.92rem;">YOR: ${r.impor_yor}%</span>`;
+
+                const stokRiil = isGudang
+                    ? `<div><b>${parseFloat(r.impor_kemasan || 0).toLocaleString('id-ID')}</b> <small style="color:#10b981; font-weight:600;">Koli</small></div><small style="color:var(--text-secondary);">0 Box Kontainer</small>`
+                    : `<div><b>${r.impor_kontainer}</b> <small style="color:var(--accent-blue); font-weight:600;">Box</small></div><small style="color:var(--text-secondary);">- Kemasan</small>`;
+
                 tr.innerHTML = `
                     <td style="text-align:center;">${idx + 1}</td>
                     <td>
@@ -615,9 +646,9 @@ $firstDayOfMonth = date('Y-m-01');
                         </span>
                     </td>
                     <td><b style="color:var(--text-primary);">${r.tanggal_laporan}</b></td>
-                    <td><span class="badge-pill" style="background:rgba(16,185,129,0.15); color:#10b981; font-weight:700; font-size:0.95rem;">${r.impor_yor}%</span></td>
-                    <td><b>${r.impor_kontainer}</b> <small style="color:var(--text-secondary);">Box</small></td>
-                    <td><code>${r.kode_tps}</code> / <code>${r.kode_gudang}</code></td>
+                    <td>${deptBadge}</td>
+                    <td>${yorBadge}</td>
+                    <td>${stokRiil}</td>
                     <td><span class="badge-pill ${isOk ? 'badge-in' : 'badge-out'}">${isOk ? 'HTTP 200 OK' : 'HTTP ' + r.http_code + ' FAILED'}</span></td>
                     <td style="text-align:center;">
                         <button type="button" class="btn-table-detail" onclick="openDetailModal(${r.id})">
@@ -666,9 +697,12 @@ $firstDayOfMonth = date('Y-m-01');
                     const imp = p.impor || {};
                     const eksp = p.ekspor || {};
 
+                    const isGudang = (d.kode_gudang === 'GPSU' || p.kodeGudang === 'GPSU');
+                    const deptDesc = isGudang ? '🏬 Gudang CFS (GPSU)' : '🏢 TPP Lapangan (CPSU)';
+
                     $('#modal-ref-no').text(d.ref_number || p.refNumber || '-');
                     $('#modal-tgl').text(d.tanggal_laporan || p.tanggalLaporan || '-');
-                    $('#modal-tps-gudang').text((d.kode_tps || p.kodeTps || 'PSU0') + ' / ' + (d.kode_gudang || p.kodeGudang || 'CPSU'));
+                    $('#modal-tps-gudang').html(`<b>${deptDesc}</b> <small style="color:var(--text-secondary);">/ ${d.kode_tps || p.kodeTps || 'PSU0'}</small>`);
                     $('#modal-created-at').text(d.created_at || '-');
 
                     const badge = $('#modal-status-badge');
@@ -678,6 +712,8 @@ $firstDayOfMonth = date('Y-m-01');
                     } else {
                         badge.addClass('badge-out').text('HTTP ' + d.http_code + ' FAILED');
                     }
+
+                    const yorLabel = isGudang ? 'SOR' : 'YOR';
 
                     // Render Table
                     const tbody = document.getElementById('modal-table-body');
@@ -691,7 +727,7 @@ $firstDayOfMonth = date('Y-m-01');
                             <td>${imp.jumlahKontainer45f || 0}</td>
                             <td><b>${imp.totalKontainer || 0}</b></td>
                             <td>${imp.totalKemasan || 0}</td>
-                            <td><span class="badge-pill badge-in" style="font-weight:700;">${imp.yor || 0}%</span></td>
+                            <td><span class="badge-pill badge-in" style="font-weight:700;">${yorLabel}: ${imp.yor || 0}%</span></td>
                         </tr>
                         <tr>
                             <td><strong style="color:#a78bfa;">📤 EKSPOR</strong></td>
@@ -702,7 +738,7 @@ $firstDayOfMonth = date('Y-m-01');
                             <td>${eksp.jumlahKontainer45f || 0}</td>
                             <td><b>${eksp.totalKontainer || 0}</b></td>
                             <td>${eksp.totalKemasan || 0}</td>
-                            <td><span class="badge-pill" style="background:rgba(139,92,246,0.15); color:#a78bfa; font-weight:700;">${eksp.yor || 0}%</span></td>
+                            <td><span class="badge-pill" style="background:rgba(139,92,246,0.15); color:#a78bfa; font-weight:700;">${yorLabel}: ${eksp.yor || 0}%</span></td>
                         </tr>
                     `;
 

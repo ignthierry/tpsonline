@@ -85,12 +85,12 @@ if ($action === 'send') {
         'refNumber'      => trim((string)$payload['refNumber']),
         'tanggalLaporan' => $tglLaporan,
         'impor'          => [
-            'jumlahKontainer20f' => (int)($imporData['jumlahKontainer20f'] ?? 0),
-            'jumlahKontainer40f' => (int)($imporData['jumlahKontainer40f'] ?? 0),
-            'jumlahKontainer45f' => (int)($imporData['jumlahKontainer45f'] ?? 0),
-            'totalKontainer'     => (int)($imporData['totalKontainer'] ?? ((int)($imporData['jumlahKontainer20f'] ?? 0) + (int)($imporData['jumlahKontainer40f'] ?? 0) + (int)($imporData['jumlahKontainer45f'] ?? 0))),
+            'jumlahKontainer20f' => $isCPSU ? (int)($imporData['jumlahKontainer20f'] ?? 0) : 0,
+            'jumlahKontainer40f' => $isCPSU ? (int)($imporData['jumlahKontainer40f'] ?? 0) : 0,
+            'jumlahKontainer45f' => $isCPSU ? (int)($imporData['jumlahKontainer45f'] ?? 0) : 0,
+            'totalKontainer'     => $isCPSU ? (int)($imporData['totalKontainer'] ?? ((int)($imporData['jumlahKontainer20f'] ?? 0) + (int)($imporData['jumlahKontainer40f'] ?? 0) + (int)($imporData['jumlahKontainer45f'] ?? 0))) : 0,
             'totalKemasan'       => $isCPSU ? 0 : (float)($imporData['totalKemasan'] ?? 0),
-            'kapasitasLapangan'  => (float)($imporData['kapasitasLapangan'] ?? 0),
+            'kapasitasLapangan'  => $isCPSU ? (float)($imporData['kapasitasLapangan'] ?? 0) : 0,
             'kapasitasGudang'    => $isCPSU ? 0 : (float)($imporData['kapasitasGudang'] ?? 0),
             'yor'                => (float)($imporData['yor'] ?? 0) // Sesuai RPLP_YOR: float presisi penuh, tidak dibulatkan
         ],
@@ -222,10 +222,16 @@ if ($action === 'fetch_stock') {
         $tglLaporan = "{$m[3]}-{$m[2]}-{$m[1]}";
     }
 
-    $kodeGudang = strtoupper(trim((string)input('kodeGudang', 'CPSU')));
-    $isCPSU = ($kodeGudang === 'CPSU' || empty($kodeGudang));
+    $dept = strtolower(trim((string)input('dept', 'tpp')));
+    $kodeGudang = strtoupper(trim((string)input('kodeGudang', '')));
+    if (empty($kodeGudang)) {
+        $kodeGudang = ($dept === 'gudang') ? 'GPSU' : 'CPSU';
+    }
+    $isCPSU = ($kodeGudang === 'CPSU');
 
     $resultStock = [
+        'dept'       => $isCPSU ? 'tpp' : 'gudang',
+        'kodeGudang' => $kodeGudang,
         'impor' => [
             'c20'               => 0,
             'c40'               => 0,
@@ -233,8 +239,9 @@ if ($action === 'fetch_stock') {
             'total'             => 0,
             'teus'              => 0,
             'totalKemasan'      => 0,
-            'kapasitasLapangan' => 1090, // Default Master_Constanta: YOR
-            'kapasitasGudang'   => $isCPSU ? 0 : 3750, // Untuk CPSU = 0 karena Container Yard
+            'totalVolume'       => 0,
+            'kapasitasLapangan' => $isCPSU ? 1090 : 0,
+            'kapasitasGudang'   => $isCPSU ? 0 : 3750,
             'yor'               => 0.0
         ],
         'ekspor' => [
@@ -255,96 +262,125 @@ if ($action === 'fetch_stock') {
     ];
 
     try {
-        global $pdo_tpp;
+        global $pdo_tpp, $pdo_primamas;
+
+        // Ambil Konfigurasi dari Master_Constanta (tppconstanta di tpp_primamas)
         if ($pdo_tpp) {
-            // 1. Ambil Konfigurasi dari Master_Constanta (tppconstanta)
             $stmtCons = $pdo_tpp->query("SELECT YOR, SOR_lcl, YOR_RTPP, y_20, y_40, y_45 FROM tppconstanta LIMIT 1");
             if ($stmtCons) {
                 $consRow = $stmtCons->fetch(PDO::FETCH_ASSOC);
                 if ($consRow) {
-                    $kapLap = (float)($consRow['YOR'] ?? 1090);
-                    $kapGud = (float)($consRow['SOR_lcl'] ?? 3750);
-                    $resultStock['impor']['kapasitasLapangan'] = $kapLap > 0 ? $kapLap : 1090;
-                    $resultStock['impor']['kapasitasGudang']   = $isCPSU ? 0 : ($kapGud > 0 ? $kapGud : 3750);
                     $resultStock['constanta'] = $consRow;
                 }
             }
+        }
 
-            // 2. Hitung Stok Kontainer Riil Depo sesuai logika RPLP_YOR & Master_Constanta
-            $sqlStock = "
-                SELECT
-                    SUM(IF(tppcontplp.size = 20, 1, 0)) AS jml20,
-                    SUM(IF(tppcontplp.size = 40, 1, 0)) AS jml40,
-                    SUM(IF(tppcontplp.size = 45, 1, 0)) AS jml45
-                FROM tppcontplp
-                JOIN tppconsignee ON tppconsignee.Id_Cons = tppcontplp.idCons_FK
-                JOIN tppmanifestplp ON tppmanifestplp.idPLP = tppcontplp.idPLP_FK
-                WHERE tppcontplp.flag = 1
-                  AND tppcontplp.SBCF = 0
-                  AND tppcontplp.keterangan IS NULL
-                  AND tppcontplp.BCF IS NULL
-                  AND tppcontplp.tglInDepo IS NOT NULL 
-                  AND tppcontplp.tglInDepo > '1970-01-01'
-                  AND DATE(tppcontplp.tglInDepo) <= STR_TO_DATE(:tglAkhir1, '%d-%m-%Y')
-                  AND NOT EXISTS (
-                    SELECT 1 
-                    FROM tppsuratjalan 
-                    WHERE tppsuratjalan.idManifest = tppcontplp.idCont
-                      AND tppsuratjalan.typeManifest = 'PLP'
-                      AND tppsuratjalan.tglSuratJalan <= STR_TO_DATE(:tglAkhir2, '%d-%m-%Y')
-                  )
-            ";
-            $stmtStock = $pdo_tpp->prepare($sqlStock);
-            $stmtStock->execute([':tglAkhir1' => $tglLaporan, ':tglAkhir2' => $tglLaporan]);
-            $stockRow = $stmtStock->fetch(PDO::FETCH_ASSOC);
+        $kapLapBaku = (float)($resultStock['constanta']['YOR'] ?? 1090);
+        $kapGudBaku = (float)($resultStock['constanta']['SOR_lcl'] ?? 3750);
 
-            if ($stockRow) {
-                $c20 = (int)($stockRow['jml20'] ?? 0);
-                $c40 = (int)($stockRow['jml40'] ?? 0);
-                $c45 = (int)($stockRow['jml45'] ?? 0);
-                $resultStock['impor']['c20'] = $c20;
-                $resultStock['impor']['c40'] = $c40;
-                $resultStock['impor']['c45'] = $c45;
-                $resultStock['impor']['total'] = $c20 + $c40 + $c45;
+        if ($isCPSU) {
+            // =============================================================
+            // A. TPP (PLP / LAPANGAN PENUMPUKAN FCL - KODE GUDANG: CPSU)
+            // =============================================================
+            $resultStock['impor']['kapasitasLapangan'] = $kapLapBaku > 0 ? $kapLapBaku : 1090;
+            $resultStock['impor']['kapasitasGudang']   = 0;
+            $resultStock['impor']['totalKemasan']      = 0;
 
-                // Formula TEUs baku dari RPLP_YOR: (jml20 * 1) + (jml40 * 2) + (jml45 * 2)
-                $teus = ($c20 * 1) + ($c40 * 2) + ($c45 * 2);
-                $resultStock['impor']['teus'] = $teus;
+            if ($pdo_tpp) {
+                $sqlStock = "
+                    SELECT
+                        SUM(IF(tppcontplp.size = 20, 1, 0)) AS jml20,
+                        SUM(IF(tppcontplp.size = 40, 1, 0)) AS jml40,
+                        SUM(IF(tppcontplp.size = 45, 1, 0)) AS jml45
+                    FROM tppcontplp
+                    JOIN tppconsignee ON tppconsignee.Id_Cons = tppcontplp.idCons_FK
+                    JOIN tppmanifestplp ON tppmanifestplp.idPLP = tppcontplp.idPLP_FK
+                    WHERE tppcontplp.flag = 1
+                      AND tppcontplp.SBCF = 0
+                      AND tppcontplp.keterangan IS NULL
+                      AND tppcontplp.BCF IS NULL
+                      AND tppcontplp.tglInDepo IS NOT NULL 
+                      AND tppcontplp.tglInDepo > '1970-01-01'
+                      AND DATE(tppcontplp.tglInDepo) <= STR_TO_DATE(:tglAkhir1, '%d-%m-%Y')
+                      AND NOT EXISTS (
+                        SELECT 1 
+                        FROM tppsuratjalan 
+                        WHERE tppsuratjalan.idManifest = tppcontplp.idCont
+                          AND tppsuratjalan.typeManifest = 'PLP'
+                          AND tppsuratjalan.tglSuratJalan <= STR_TO_DATE(:tglAkhir2, '%d-%m-%Y')
+                      )
+                ";
+                $stmtStock = $pdo_tpp->prepare($sqlStock);
+                $stmtStock->execute([':tglAkhir1' => $tglLaporan, ':tglAkhir2' => $tglLaporan]);
+                $stockRow = $stmtStock->fetch(PDO::FETCH_ASSOC);
 
-                $kapLap = $resultStock['impor']['kapasitasLapangan'];
-                if ($kapLap > 0) {
-                    // Sesuai RPLP_YOR: tidak dibulatkan, floating point murni
-                    $resultStock['impor']['yor'] = (float)(($teus / $kapLap) * 100);
-                }
-            }
+                if ($stockRow) {
+                    $c20 = (int)($stockRow['jml20'] ?? 0);
+                    $c40 = (int)($stockRow['jml40'] ?? 0);
+                    $c45 = (int)($stockRow['jml45'] ?? 0);
+                    $resultStock['impor']['c20'] = $c20;
+                    $resultStock['impor']['c40'] = $c40;
+                    $resultStock['impor']['c45'] = $c45;
+                    $resultStock['impor']['total'] = $c20 + $c40 + $c45;
 
-            // 3. Hitung Total Kemasan (untuk CPSU otomatis 0 karena Container Yard)
-            if ($isCPSU) {
-                $resultStock['impor']['totalKemasan'] = 0;
-                $resultStock['impor']['kapasitasGudang'] = 0;
-            } else {
-                $sqlLcl = '
-                    SELECT COUNT(*) as totalKemasan, SUM(volume) as totalVolume 
-                    FROM tppmanifestlcl m 
-                    WHERE m.flag = 1 
-                    AND NOT EXISTS (
-                        SELECT 1 FROM cont_temp_out temp 
-                        WHERE (temp.type = "LCL" OR temp.type IS NULL OR temp.type = "")
-                          AND ((temp.idmanifest IS NOT NULL AND temp.idmanifest = m.idManifestLCL) OR temp.noCont = m.noCont)
-                    )
-                    AND m.idManifestLCL NOT IN (
-                        SELECT idManifest FROM tppsuratjalan WHERE typeManifest = "LCL"
-                    )
-                    AND m.lokasi LIKE "%GD%"
-                ';
-                $stmtLcl = $pdo_tpp->query($sqlLcl);
-                if ($stmtLcl) {
-                    $lclRow = $stmtLcl->fetch(PDO::FETCH_ASSOC);
-                    if ($lclRow) {
-                        $resultStock['impor']['totalKemasan'] = (int)($lclRow['totalKemasan'] ?? 0);
-                        $resultStock['impor']['totalVolume']  = (float)($lclRow['totalVolume'] ?? 0);
+                    // Formula TEUs baku dari RPLP_YOR: (jml20 * 1) + (jml40 * 2) + (jml45 * 2)
+                    $teus = ($c20 * 1) + ($c40 * 2) + ($c45 * 2);
+                    $resultStock['impor']['teus'] = $teus;
+
+                    $kapLap = $resultStock['impor']['kapasitasLapangan'];
+                    if ($kapLap > 0) {
+                        $resultStock['impor']['yor'] = (float)(($teus / $kapLap) * 100);
                     }
                 }
+            }
+        } else {
+            // =============================================================
+            // B. GUDANG (LCL / CFS WAREHOUSE - KODE GUDANG: GPSU)
+            // Acuan Beranda.php: Luas 2.366 m2 x Tinggi Max 6m = 14.196 M3
+            // =============================================================
+            $kapGudBaku = 14196; // Kapasitas Fisik Gudang: Luas 2.366 m2 * 6 m tinggi max
+            $resultStock['impor']['kapasitasLapangan'] = 0;
+            $resultStock['impor']['kapasitasGudang']   = $kapGudBaku;
+
+            if ($pdo_primamas) {
+                // 1. Ambil Total Kemasan & Total Volume Kargo Riil di Gudang dari manifest (Kriteria Valid Beranda.php)
+                $sqlKms = "
+                    SELECT 
+                        COUNT(*) as totalPos,
+                        COALESCE(SUM(manifest.JML_Kemasan), 0) as totalKemasan,
+                        COALESCE(SUM(manifest.Volume), 0) as totalVolume,
+                        COALESCE(SUM(manifest.Berat), 0) as totalBerat
+                    FROM manifest
+                    INNER JOIN consignee ON manifest.Id_Cons_FK = consignee.Id_Cons
+                    INNER JOIN master_bl ON master_bl.Id_MasBL = manifest.Id_MasBL_FK
+                    INNER JOIN forwarding ON forwarding.Id_For = master_bl.Id_For_FK
+                    INNER JOIN kontainer ON kontainer.Id_Kontainer = master_bl.Id_Kontainer_FK
+                    WHERE manifest.jamKeluar IS NULL
+                      AND manifest.Id_OB NOT IN (SELECT Id_OB_FK FROM invoice_gudang WHERE Id_OB_FK IS NOT NULL)
+                      AND manifest.Tgl_Stripping <= STR_TO_DATE(:tglAkhir, '%d-%m-%Y')
+                ";
+                $stmtKms = $pdo_primamas->prepare($sqlKms);
+                $stmtKms->execute([':tglAkhir' => $tglLaporan]);
+                $kmsRow = $stmtKms->fetch(PDO::FETCH_ASSOC);
+
+                if ($kmsRow) {
+                    $totKemasan = (int)$kmsRow['totalKemasan'];
+                    $totVolume  = (float)$kmsRow['totalVolume'];
+                    $resultStock['impor']['totalKemasan'] = $totKemasan;
+                    $resultStock['impor']['totalVolume']  = $totVolume;
+
+                    // Perhitungan Utilisasi Gudang (SOR - Shed Occupancy Rate): (Volume Terisi / 14.196 M3) * 100%
+                    if ($kapGudBaku > 0) {
+                        $resultStock['impor']['yor'] = (float)(($totVolume / $kapGudBaku) * 100);
+                    }
+                }
+
+                // 2. Untuk Gudang (GPSU): Khusus barang kemasan/kargo LCL, seluruh kontainer bernilai 0
+                $resultStock['impor']['c20'] = 0;
+                $resultStock['impor']['c40'] = 0;
+                $resultStock['impor']['c45'] = 0;
+                $resultStock['impor']['total'] = 0;
+                $resultStock['impor']['teus'] = 0;
             }
         }
     } catch (Exception $e) {
@@ -397,6 +433,14 @@ if ($action === 'history' || $action === 'report') {
             $params[':q3'] = "%$q%";
         }
 
+        // Filter Departemen Operasional (TPP / CPSU vs GUDANG / GPSU)
+        $deptParam = strtolower(trim((string)input('dept', input('kodeGudang', ''))));
+        if ($deptParam === 'tpp' || $deptParam === 'cpsu') {
+            $where[] = "kode_gudang = 'CPSU'";
+        } elseif ($deptParam === 'gudang' || $deptParam === 'gpsu') {
+            $where[] = "kode_gudang = 'GPSU'";
+        }
+
         $whereSql = !empty($where) ? " WHERE " . implode(" AND ", $where) : "";
 
         $sql = "
@@ -419,9 +463,12 @@ if ($action === 'history' || $action === 'report') {
         $rows = [];
         $summary = [
             'total'          => count($rawRows),
+            'tpp_count'      => 0,
+            'gudang_count'   => 0,
             'avg_impor'      => 0,
             'avg_ekspor'     => 0,
             'total_kontainer'=> 0,
+            'total_kemasan'  => 0,
             'today'          => 0
         ];
 
@@ -436,27 +483,41 @@ if ($action === 'history' || $action === 'report') {
             $sumYorImpor += (float)$r['impor_yor'];
             $sumYorEkspor += (float)$r['ekspor_yor'];
             $summary['total_kontainer'] += (int)$r['impor_total_kontainer'] + (int)$r['ekspor_total_kontainer'];
+            $summary['total_kemasan']   += (float)$r['impor_total_kemasan'] + (float)$r['ekspor_total_kemasan'];
+
+            if ($r['kode_gudang'] === 'GPSU') {
+                $summary['gudang_count']++;
+                $deptName = 'Gudang';
+            } else {
+                $summary['tpp_count']++;
+                $deptName = 'TPP';
+            }
 
             if (strpos($r['created_at'], $todayStr) !== false || $r['tanggal_laporan'] === $todayStr) {
                 $summary['today']++;
             }
 
             $rows[] = [
-                'id'              => $r['id'],
-                'ref_number'      => $r['ref_number'],
-                'kode_tps'        => $r['kode_tps'],
-                'kode_gudang'     => $r['kode_gudang'],
-                'tanggal_laporan' => $r['tanggal_laporan'],
-                'impor_yor'       => (float)$r['impor_yor'],
-                'impor_kontainer' => (int)$r['impor_total_kontainer'],
-                'ekspor_yor'      => (float)$r['ekspor_yor'],
-                'ekspor_kontainer'=> (int)$r['ekspor_total_kontainer'],
-                'status_kirim'    => $r['status_kirim'],
-                'http_code'       => (int)$r['http_code'],
-                'message'         => $r['message'],
-                'created_at'      => $r['created_at'],
-                'raw_payload'     => $payload,
-                'raw_response'    => $response
+                'id'                  => $r['id'],
+                'ref_number'          => $r['ref_number'],
+                'kode_tps'            => $r['kode_tps'],
+                'kode_gudang'         => $r['kode_gudang'],
+                'dept'                => $deptName,
+                'tanggal_laporan'     => $r['tanggal_laporan'],
+                'impor_yor'           => (float)$r['impor_yor'],
+                'impor_kontainer'     => (int)$r['impor_total_kontainer'],
+                'impor_kemasan'       => (float)$r['impor_total_kemasan'],
+                'impor_kapasitas_lap' => (float)($payload['impor']['kapasitasLapangan'] ?? 0),
+                'impor_kapasitas_gud' => (float)($payload['impor']['kapasitasGudang'] ?? 0),
+                'ekspor_yor'          => (float)$r['ekspor_yor'],
+                'ekspor_kontainer'    => (int)$r['ekspor_total_kontainer'],
+                'ekspor_kemasan'      => (float)$r['ekspor_total_kemasan'],
+                'status_kirim'        => $r['status_kirim'],
+                'http_code'           => (int)$r['http_code'],
+                'message'             => $r['message'],
+                'created_at'          => $r['created_at'],
+                'raw_payload'         => $payload,
+                'raw_response'        => $response
             ];
         }
 
