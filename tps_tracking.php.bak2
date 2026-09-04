@@ -899,7 +899,7 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
 
         /* Khusus Tab TPP: Hanya tampilkan Nomor Kontainer (sembunyikan field ukuran, jenis, kode tps, kode gudang) */
         body:not(.dept-is-gudang) #ukuran-cont-group,
-        #section-extra-fields {
+        body:not(.dept-is-gudang) #section-extra-fields {
             display: none !important;
         }
         body:not(.dept-is-gudang) #no-cont-wrapper {
@@ -1005,8 +1005,8 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                                             <input type="hidden" id="departemen-val" value="tpp">
                                         </div>
 
-                                        <!-- Container Field Nomor Kontainer (Tampil Penuh) -->
-                                        <div id="no-cont-wrapper" style="margin-bottom: 14px;">
+                                        <!-- Container Field Nomor Kontainer & Extra Fields (Ukuran) -->
+                                        <div id="no-cont-wrapper" style="display: grid; grid-template-columns: <?= $activeDept === 'gudang' ? '1.35fr 1fr' : '1fr' ?>; gap: 16px; margin-bottom: 14px;">
                                             <div class="field-group">
                                                 <div class="label-header">
                                                     <label for="no-cont">Nomor Kontainer <span class="req-star">*</span></label>
@@ -1017,14 +1017,17 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                                                 </select>
                                             </div>
 
-                                            <div class="field-group" id="ukuran-cont-group" style="display: none;">
-                                                <input type="hidden" id="ukuran-cont" value="40">
-                                                <input type="hidden" id="ukuran-cont-display" value="40 ft">
+                                            <div class="field-group" id="ukuran-cont-group" style="<?= $activeDept === 'gudang' ? '' : 'display: none;' ?>">
+                                                <label for="ukuran-cont-display">Ukuran Kontainer <span class="req-star">*</span></label>
+                                                <div style="position: relative;">
+                                                    <input type="text" id="ukuran-cont-display" class="input-control" value="40 ft" readonly style="background:var(--bg-card); cursor:not-allowed; opacity:0.9; font-weight:600; font-family:'JetBrains Mono',monospace;" title="Ukuran kontainer otomatis terisi dari kontainer terpilih (Readonly)">
+                                                    <input type="hidden" id="ukuran-cont" value="40">
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <!-- Extra fields (Disembunyikan: Parameter baku otomatis terisi di latar belakang) -->
-                                        <div id="section-extra-fields" style="display: none;">
+                                        <!-- Extra fields (Hanya untuk Gudang, disembunyikan untuk TPP agar user tidak perlu mengisi/memilih data lain) -->
+                                        <div id="section-extra-fields" style="<?= $activeDept === 'gudang' ? '' : 'display: none;' ?>">
                                             <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 14px;">
                                                 <div class="field-group">
                                                     <label for="jenis-cont">Jenis Kontainer <span class="req-star">*</span></label>
@@ -1322,7 +1325,6 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                         <option value="23" ${currentVal==='23' || !currentVal || currentVal==='17'?'selected':''}>23 — STRIPPING STUFFING LINI 2 (Pembongkaran Kargo LCL)</option>
                         <option value="21" ${currentVal==='21'?'selected':''}>21 — BEHANDLE LINI 2 (Pemeriksaan Fisik Kargo / Gudang)</option>
                         <option value="6" ${currentVal==='6'?'selected':''}>6 — GATE OUT LINI 2 (Kontainer Kosong / Empty Return)</option>
-                        <option value="20" ${currentVal==='20'?'selected':''}>20 — PICKUP LINI 2 (Pengeluaran Kargo LCL per B/L)</option>
                         <option value="24" ${currentVal==='24'?'selected':''}>24 — STUFFING KE GUDANG LINI 2 (Pemuatan Kargo Ekspor)</option>
                     </optgroup>
                     <optgroup label="🚢 Alur Ekspor Lini 2">
@@ -1405,7 +1407,10 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                 $('#jenis-cont').val('7'); // 7 = LCL
                 $('#kode-dok').val('704'); // 704 = MASTER B/L (Standar LCL)
                 
-                // Extra fields tetap disembunyikan agar hanya menyisakan Nomor Kontainer di form
+                // Show extra inputs for Gudang
+                $('#ukuran-cont-group').show();
+                $('#section-extra-fields').show();
+                $('#no-cont-wrapper').css('grid-template-columns', '1.35fr 1fr');
 
                 if (!isInit) showToast('Departemen Gudang (LCL / database primamas) aktif — Dokumen default: 704 (MASTER B/L)', 'info');
             } else {
@@ -1423,7 +1428,9 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                 $('#kode-dok').val('3'); // 3 = Persetujuan PLP (Standar PLP FCL)
 
                 // Hide extra inputs for TPP so user only fills/selects Nomor Kontainer
+                $('#ukuran-cont-group').hide();
                 $('#section-extra-fields').hide();
+                $('#no-cont-wrapper').css('grid-template-columns', '1fr');
 
                 if (!isInit) showToast('Departemen TPP (PLP / database tpp_primamas) aktif — Dokumen default: 3 (Persetujuan PLP)', 'info');
             }
@@ -1519,39 +1526,24 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
             if (!item) return;
 
             const kdKeg = $('#kode-kegiatan').val();
-            // 5 = Gate In PLP (Masuk Gudang LCL)
-            if (kdKeg === '5') {
-                if (item.waktu_masuk) $('#waktu-kegiatan').val(item.waktu_masuk);
-                if (item.departemen === 'GUDANG') {
-                    $('#jenis-cont').val('7'); // Masuk Gudang: kontainer membawa kargo LCL (Jenis 7)
-                }
+            // 5 = Gate In PLP
+            if (kdKeg === '5' && item.waktu_masuk) {
+                $('#waktu-kegiatan').val(item.waktu_masuk);
             } 
             // 16 / 23 = Stripping Stuffing
-            else if (kdKeg === '16' || kdKeg === '23') {
-                if (item.waktu_stripping) $('#waktu-kegiatan').val(item.waktu_stripping);
-                if (item.departemen === 'GUDANG') {
-                    $('#jenis-cont').val('7'); // Stripping: pembongkaran kargo LCL (Jenis 7)
-                }
+            else if ((kdKeg === '16' || kdKeg === '23') && item.waktu_stripping) {
+                $('#waktu-kegiatan').val(item.waktu_stripping);
             } 
-            // 21 = Behandle / 20 = Pickup LCL
-            else if (kdKeg === '21' || kdKeg === '20') {
+            // 6 = Gate Out Lini 2
+            else if (kdKeg === '6' && item.waktu_keluar) {
+                $('#waktu-kegiatan').val(item.waktu_keluar);
                 if (item.departemen === 'GUDANG') {
-                    $('#jenis-cont').val('7'); // Kargo LCL (Jenis 7)
-                }
-            }
-            // 6 = Gate Out Lini 2 (Keluar Kosong ex Stripping)
-            else if (kdKeg === '6') {
-                if (item.waktu_keluar) $('#waktu-kegiatan').val(item.waktu_keluar);
-                if (item.departemen === 'GUDANG') {
-                    $('#jenis-cont').val('4'); // Gate Out Gudang: kontainer keluar dalam keadaan kosong (Jenis 4 EMPTY)
+                    $('#jenis-cont').val('4'); // Gate Out Gudang kontainer kosong (EMPTY)
                 }
             } 
             // Fallback ke waktu_masuk jika ada
             else if (item.waktu_masuk && !$('#waktu-kegiatan').val()) {
                 $('#waktu-kegiatan').val(item.waktu_masuk);
-                if (item.departemen === 'GUDANG') {
-                    $('#jenis-cont').val(kdKeg === '6' ? '4' : '7');
-                }
             }
         }
 
@@ -1562,16 +1554,6 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                 $('#block-loc').val('');
                 $('#slot-loc').val('');
                 $('#tier-loc').val('');
-            }
-
-            // Logika Jenis Kontainer untuk Gudang:
-            // Kontainer datang membawa kargo LCL (Jenis 7 LCL). Setelah selesai stripping dan keluar depo, kontainer kosong menjadi Empty (Jenis 4 EMPTY).
-            if (currentDept === 'gudang') {
-                if (val === '6') {
-                    $('#jenis-cont').val('4'); // Gate Out Gudang: kontainer kosong keluar (Jenis 4 EMPTY)
-                } else {
-                    $('#jenis-cont').val('7'); // Gate In, Stripping, Behandle, Pickup: kontainer bermuatan kargo LCL (Jenis 7 LCL)
-                }
             }
 
             // Set otomatis dokumen berdasarkan alur kegiatan & departemen
@@ -1596,16 +1578,6 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                 } else {
                     if (!$('#kode-dok').val() || $('#kode-dok').val() === '3') {
                         $('#kode-dok').val('20'); // BC 2.0 (SPPB PIB)
-                    }
-                }
-            } else if (val === '21') {
-                // 21 = Behandle Lini 2 -> Dokumen 8 (PPB - Dok. Periksa Fisik)
-                $('#kode-dok').val('8');
-            } else if (val === '20') {
-                // 20 = Pickup Lini 2 -> Default Dokumen SPPB BC 2.0 (1) atau BC 2.3 (2)
-                if (currentDept === 'gudang') {
-                    if (!$('#kode-dok').val() || $('#kode-dok').val() === '3' || $('#kode-dok').val() === '704') {
-                        $('#kode-dok').val('1');
                     }
                 }
             } else if (val === '7' || val === '8' || val === '18' || val === '24') {
@@ -1825,7 +1797,7 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
 
             containerBox.slideDown(250);
             titleElem.html(`[${contNo}]`);
-            summaryBar.html(`<div style="display:flex; align-items:center; gap:8px; padding:4px 0; color:var(--accent-blue);"><span class="pulse-dot"></span> Sedang menelusuri riwayat alur operasional kontainer <b>${contNo}</b> di database ${currentDept.toUpperCase()}...</div>`);
+            summaryBar.html(`<div style="display:flex; align-items:center; gap:8px; padding:4px 0; color:var(--accent-blue);"><span class="pulse-dot"></span> Sedang menelusuri riwayat 6 alur pergerakan kontainer <b>${contNo}</b> di database ${currentDept.toUpperCase()}...</div>`);
             cardsGrid.html(`
                 <div style="grid-column: 1 / -1; padding: 20px; text-align: center; color: var(--text-secondary);">
                     <div style="font-size: 1.4rem; margin-bottom: 6px;">⏳</div>
@@ -2064,13 +2036,6 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
             // 1. Kode Kegiatan
             $('#kode-kegiatan').val(p.kodeKegiatan.toString());
             onKegiatanChange(p.kodeKegiatan.toString());
-
-            // 1b. Jenis Kontainer dari Payload Alur Terpilih (Gate In/Stripping/Behandle/Pickup = 7 LCL, Gate Out = 4 EMPTY)
-            if (p.jenisKontainer) {
-                $('#jenis-cont').val(p.jenisKontainer.toString());
-            } else if (currentDept === 'gudang') {
-                $('#jenis-cont').val(p.kodeKegiatan == 6 ? '4' : '7');
-            }
 
             // 2. Waktu Kegiatan
             if (p.waktuKegiatan) {

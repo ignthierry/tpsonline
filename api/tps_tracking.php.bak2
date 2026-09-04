@@ -484,21 +484,12 @@ if ($action === 'get_container_timeline') {
                     $parsed = json_decode($l['request_params'], true);
                     if (!empty($parsed['kodeKegiatan'])) {
                         $k = (int)$parsed['kodeKegiatan'];
-                        $info = [
-                            'sent_at'       => date('d-m-Y H:i', strtotime($l['created_at'])),
-                            'waktuKegiatan' => $parsed['waktuKegiatan'] ?? '',
-                            'status'        => 'SUCCESS'
-                        ];
                         if (!isset($sentKegiatan[$k])) {
-                            $sentKegiatan[$k] = $info;
-                        }
-                        $bl = trim((string)($parsed['nomorBlAwb'] ?? ''));
-                        if ($bl && !isset($sentKegiatan["{$k}_{$bl}"])) {
-                            $sentKegiatan["{$k}_{$bl}"] = $info;
-                        }
-                        $dok = trim((string)($parsed['nomorDokumen'] ?? ''));
-                        if ($dok && !isset($sentKegiatan["{$k}_{$dok}"])) {
-                            $sentKegiatan["{$k}_{$dok}"] = $info;
+                            $sentKegiatan[$k] = [
+                                'sent_at'       => date('d-m-Y H:i', strtotime($l['created_at'])),
+                                'waktuKegiatan' => $parsed['waktuKegiatan'] ?? '',
+                                'status'        => 'SUCCESS'
+                            ];
                         }
                     }
                 }
@@ -1205,73 +1196,7 @@ if ($action === 'get_container_timeline') {
                 'payload'       => !empty($wStripping) ? $pStr : null
             ];
 
-            $idMasBL = (int)$gRow['Id_MasBL'];
-
-            // 3. Behandle LCL Lini 2 (Kode 21 - Pemeriksaan Fisik Kargo LCL)
-            // Query manifest yang diperiksa fisik (behandle != 0)
-            $sqlBehandleG = "
-                SELECT man.Id_OB, man.No_BL, man.behandle, man.tglBehandle, man.tglPeriksaCont
-                FROM manifest man
-                WHERE man.Id_MasBL_FK = :idMasBL AND man.behandle != 0
-                ORDER BY man.tglPeriksaCont DESC, man.tglBehandle DESC
-                LIMIT 1
-            ";
-            $stmtBehandleG = $pdo_primamas->prepare($sqlBehandleG);
-            $stmtBehandleG->execute([':idMasBL' => $idMasBL]);
-            $bRow = $stmtBehandleG->fetch(PDO::FETCH_ASSOC);
-
-            $hasBehandleG = false;
-            $wBehandleG = '';
-            $pBehandle = null;
-            $noBlBehandle = $bRow ? ($bRow['No_BL'] ?: $noBl) : $noBl;
-
-            if ($bRow && (!empty($bRow['tglPeriksaCont']) || !empty($bRow['tglBehandle']))) {
-                $wBehandleG = $formatDmyHis($bRow['tglPeriksaCont'] ?: $bRow['tglBehandle']);
-                $hasBehandleG = !empty($wBehandleG);
-            }
-
-            if ($hasBehandleG) {
-                $pBehandle = [
-                    'departemen'      => 'GUDANG',
-                    'nomorKontainer'  => $noContClean,
-                    'ukuranKontainer' => $sz,
-                    'jenisKontainer'  => '7', // 7 = LCL
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'GPSU',
-                    'kodeKegiatan'    => 21,
-                    'waktuKegiatan'   => $wBehandleG
-                ];
-                // Referensi PDF: Kode 8 = PPB - Dok. Periksa Fisik
-                $pBehandle['kodeDokumen'] = '8';
-                $pBehandle['nomorDokumen'] = 'PPB/' . ($noBlBehandle ?: $noContClean);
-                if ($tglBl) $pBehandle['tanggalDokumen'] = $tglBl;
-                if ($noBlBehandle) {
-                    $pBehandle['nomorBlAwb'] = $noBlBehandle;
-                    if ($tglBl) $pBehandle['tanggalBlAwb'] = $tglBl;
-                }
-            }
-
-            $timelineG[] = [
-                'step'          => 3,
-                'kodeKegiatan'  => 21,
-                'kegiatanLabel' => 'Behandle LCL Lini 2 (Pemeriksaan Fisik)',
-                'icon'          => '🔍',
-                'badgeCategory' => 'Pemeriksaan Pabean',
-                'available'     => $hasBehandleG,
-                'waktuKegiatan' => $wBehandleG ?: '-',
-                'nomorPolisi'   => '',
-                'nopolLabel'    => '-',
-                'kodeDokumen'   => '8',
-                'namaDokumen'   => 'PPB - Dok. Periksa Fisik',
-                'dokumenLabel'  => $hasBehandleG ? "PPB (Kode 8) [B/L: {$noBlBehandle}]" : '-',
-                'lokasiYard'    => '-',
-                'deskripsi'     => $hasBehandleG ? "Pemeriksaan fisik pabean kargo LCL di gudang (House B/L: {$noBlBehandle})" : "Pemeriksaan fisik belum dilaksanakan / tidak ada behandle pada kontainer ini",
-                'is_sent'       => isset($sentKegiatan[21]) || ($noBlBehandle && isset($sentKegiatan["21_{$noBlBehandle}"])),
-                'sent_info'     => $sentKegiatan["21_{$noBlBehandle}"] ?? ($sentKegiatan[21] ?? null),
-                'payload'       => $pBehandle
-            ];
-
-            // 4. Gate Out Gudang (Empty Kontainer Keluar ex Stripping) (Kode 6)
+            // 3. Gate Out Gudang (Empty Kontainer Keluar ex Stripping)
             // Referensi PDF: Kode 40 = Pengeluaran Empty Container ex. Stripping
             $pOut = [
                 'departemen'      => 'GUDANG',
@@ -1293,7 +1218,7 @@ if ($action === 'get_container_timeline') {
             }
 
             $timelineG[] = [
-                'step'          => 4,
+                'step'          => 3,
                 'kodeKegiatan'  => 6,
                 'kegiatanLabel' => 'Gate Out Empty Gudang (Out Trailer)',
                 'icon'          => '🚚',
@@ -1311,125 +1236,6 @@ if ($action === 'get_container_timeline') {
                 'sent_info'     => $sentKegiatan[6] ?? null,
                 'payload'       => !empty($wKeluar) ? $pOut : null
             ];
-
-            // 5+. Pengeluaran Barang / Delivery Kargo LCL per House B/L (Kode 20 - PICKUP LINI 2)
-            $sqlPickups = "
-                SELECT 
-                    inv.Id_InvGud, inv.No_SPPB, inv.Tgl_SPPB, inv.JNS_SPPB, inv.Tgl_Keluar,
-                    sj.No_surat, sj.Nopol, sj.Tgl_Out,
-                    man.Id_OB, man.No_BL
-                FROM manifest man
-                INNER JOIN invoice_gudang inv ON inv.Id_OB_FK = man.Id_OB
-                LEFT JOIN sj ON sj.Id_OB_FK = man.Id_OB
-                WHERE man.Id_MasBL_FK = :idMasBL 
-                  AND inv.No_SPPB IS NOT NULL AND inv.No_SPPB != ''
-                ORDER BY sj.Tgl_Out ASC, inv.Tgl_Keluar ASC, inv.Id_InvGud ASC
-            ";
-            $stmtPick = $pdo_primamas->prepare($sqlPickups);
-            $stmtPick->execute([':idMasBL' => $idMasBL]);
-            $pickupRows = $stmtPick->fetchAll(PDO::FETCH_ASSOC);
-
-            if (empty($pickupRows)) {
-                // Placeholder alur jika kargo belum diambil
-                $timelineG[] = [
-                    'step'          => 5,
-                    'kodeKegiatan'  => 20,
-                    'kegiatanLabel' => 'Pickup Kargo LCL Lini 2 (Pengeluaran Barang)',
-                    'icon'          => '📦🚛',
-                    'badgeCategory' => 'Pengeluaran Kargo',
-                    'available'     => false,
-                    'waktuKegiatan' => '-',
-                    'nomorPolisi'   => '',
-                    'nopolLabel'    => '-',
-                    'kodeDokumen'   => '1',
-                    'namaDokumen'   => 'SPPB (Surat Persetujuan Pengeluaran Barang)',
-                    'dokumenLabel'  => '-',
-                    'lokasiYard'    => '-',
-                    'deskripsi'     => 'Kargo LCL belum diambil oleh consignee / belum ada data SPPB & Surat Jalan pengeluaran kargo',
-                    'is_sent'       => false,
-                    'sent_info'     => null,
-                    'payload'       => null
-                ];
-            } else {
-                $stepNum = 5;
-                foreach ($pickupRows as $pRow) {
-                    $houseBl = trim((string)$pRow['No_BL']);
-                    $noSppb = trim((string)$pRow['No_SPPB']);
-                    $tglSppb = $formatDmy($pRow['Tgl_SPPB']);
-                    $nopolPickup = trim((string)$pRow['Nopol']);
-                    $noSJ = trim((string)$pRow['No_surat']);
-                    
-                    // Waktu pengeluaran: Tgl_Out surat jalan ?: Tgl_Keluar invoice
-                    $wPickupRaw = $pRow['Tgl_Out'] ?: ($pRow['Tgl_Keluar'] ? $pRow['Tgl_Keluar'] . ' 10:00:00' : '');
-                    $wPickup = $formatDmyHis($wPickupRaw);
-
-                    // Pemetaan Dokumen Pabean SPPB
-                    $sppbJns = strtoupper(trim((string)$pRow['JNS_SPPB']));
-                    $kdDokPick = '1'; // Default: 1 (SPPB BC 2.0)
-                    $namaDokPick = 'SPPB BC 2.0';
-
-                    if (strpos($sppbJns, '2.3') !== false) {
-                        $kdDokPick = '2';
-                        $namaDokPick = 'SPPB BC 2.3';
-                    } elseif (strpos($sppbJns, '1.5') !== false) {
-                        $kdDokPick = '9';
-                        $namaDokPick = 'BCF 1.5 (Barang Tidak Dikuasai)';
-                    } elseif (strpos($sppbJns, '1.6') !== false || strpos($sppbJns, 'PLB') !== false) {
-                        $kdDokPick = '41';
-                        $namaDokPick = 'SPPB PLB - BC 1.6';
-                    } elseif (strpos($sppbJns, 'RE-EXP') !== false || strpos($sppbJns, '1.2') !== false) {
-                        $kdDokPick = '28';
-                        $namaDokPick = 'Dokumen BC 1.2 - Re-Ekspor';
-                    } elseif (strpos($sppbJns, 'KEK') !== false) {
-                        $kdDokPick = '64';
-                        $namaDokPick = 'Pengeluaran KEK';
-                    }
-
-                    $pPayload = [
-                        'departemen'      => 'GUDANG',
-                        'nomorKontainer'  => $noContClean,
-                        'ukuranKontainer' => $sz,
-                        'jenisKontainer'  => '7', // 7 = LCL
-                        'kodeTps'         => 'PSU0',
-                        'kodeGudang'      => 'GPSU',
-                        'kodeKegiatan'    => 20,
-                        'waktuKegiatan'   => $wPickup ?: date('d-m-Y H:i:s')
-                    ];
-                    if ($nopolPickup) $pPayload['nomorPolisi'] = $nopolPickup;
-                    $pPayload['kodeDokumen'] = $kdDokPick;
-                    $pPayload['nomorDokumen'] = $noSppb;
-                    if ($tglSppb) $pPayload['tanggalDokumen'] = $tglSppb;
-                    if ($houseBl) {
-                        $pPayload['nomorBlAwb'] = $houseBl;
-                        if ($tglBl) $pPayload['tanggalBlAwb'] = $tglBl;
-                    }
-
-                    // Cek status pengiriman berdasarkan kode 20 + BL atau nomor dokumen
-                    $isSentPick = isset($sentKegiatan["20_{$houseBl}"]) || isset($sentKegiatan["20_{$noSppb}"]);
-                    $sentInfoPick = $sentKegiatan["20_{$houseBl}"] ?? ($sentKegiatan["20_{$noSppb}"] ?? null);
-
-                    $timelineG[] = [
-                        'step'          => $stepNum,
-                        'kodeKegiatan'  => 20,
-                        'kegiatanLabel' => "Pickup Kargo LCL Lini 2 (B/L: {$houseBl})",
-                        'icon'          => '📦🚛',
-                        'badgeCategory' => 'Pengeluaran Kargo',
-                        'available'     => !empty($wPickup) && !empty($noSppb),
-                        'waktuKegiatan' => $wPickup ?: '-',
-                        'nomorPolisi'   => $nopolPickup,
-                        'nopolLabel'    => $nopolPickup ? "Armada: {$nopolPickup}" : ($noSJ ? "SJ: {$noSJ}" : '-'),
-                        'kodeDokumen'   => $kdDokPick,
-                        'namaDokumen'   => $namaDokPick,
-                        'dokumenLabel'  => "{$namaDokPick} [Kd {$kdDokPick}]: {$noSppb}",
-                        'lokasiYard'    => '-',
-                        'deskripsi'     => "Pengeluaran kargo LCL B/L {$houseBl} berdasarkan {$namaDokPick} No. {$noSppb}" . ($noSJ ? " (SJ: {$noSJ})" : ''),
-                        'is_sent'       => $isSentPick,
-                        'sent_info'     => $sentInfoPick,
-                        'payload'       => (!empty($wPickup) && !empty($noSppb)) ? $pPayload : null
-                    ];
-                    $stepNum++;
-                }
-            }
 
             jsonResp([
                 'success'    => true,
