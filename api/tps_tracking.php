@@ -6,6 +6,8 @@
  */
 
 header('Content-Type: application/json; charset=utf-8');
+ini_set('display_errors', '0');
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
 
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/helpers.php';
@@ -542,6 +544,10 @@ if ($action === 'get_container_timeline') {
                     c.updateby_name,
                     c.updateby_date,
                     c.shipper,
+                    c.stopped,
+                    c.SBCF,
+                    c.NoBC15,
+                    c.tglBC15,
                     p.noPLP,
                     p.tglPLP,
                     p.asalPLP
@@ -566,7 +572,19 @@ if ($action === 'get_container_timeline') {
             $contSize = (strpos($cont['size'], '20') !== false) ? '20' : ((strpos($cont['size'], '45') !== false) ? '45' : '40');
             $contStatus = ($cont['status'] === 'EMPTY') ? '4' : (($cont['status'] === 'LCL') ? '7' : '8');
 
-            // 2. Query Behandle (Pemeriksaan Fisik Pabean / Buka Segel)
+            // 2. Query Job Behandle dari tppjobplp (Operasional Lapangan Riil) & Fallback ke Invoice Behandle
+            $sqlJobBehandle = "
+                SELECT j.*
+                FROM tppjobplp j
+                WHERE j.idCont_FK = :idCont
+                  AND j.jobType LIKE '%Behandle%'
+                ORDER BY j.idJob DESC
+                LIMIT 1
+            ";
+            $stmtJBe = $pdo_tpp->prepare($sqlJobBehandle);
+            $stmtJBe->execute([':idCont' => $idCont]);
+            $jobBehandle = $stmtJBe->fetch(PDO::FETCH_ASSOC);
+
             $sqlBehandle = "
                 SELECT inv.*
                 FROM tppinvcontplp ic
@@ -580,7 +598,33 @@ if ($action === 'get_container_timeline') {
             $stmtBe->execute([':idCont' => $idCont]);
             $behandle = $stmtBe->fetch(PDO::FETCH_ASSOC);
 
-            // 3. Query Stripping (Bongkar Muatan Kargo)
+            // 3. Query Log Shifting Lapangan dari container_position_logs (Modul Yard_Position)
+            $sqlShiftLog = "
+                SELECT l.*
+                FROM container_position_logs l
+                WHERE (l.idCont_FK = :idCont OR REPLACE(REPLACE(l.container_no, ' ', ''), '-', '') = :noCont)
+                  AND (l.move_type LIKE '%Shift%' OR l.move_type LIKE '%Relocate%' 
+                       OR (l.from_block IS NOT NULL AND (l.from_block != l.to_block OR l.from_slot != l.to_slot OR l.from_tier != l.to_tier)))
+                ORDER BY l.id DESC
+                LIMIT 1
+            ";
+            $stmtShift = $pdo_tpp->prepare($sqlShiftLog);
+            $stmtShift->execute([':idCont' => $idCont, ':noCont' => $noContClean]);
+            $shiftLog = $stmtShift->fetch(PDO::FETCH_ASSOC);
+
+            // 4. Query Job Stripping dari tppjobplp (Operasional Lapangan Riil) & Fallback ke Invoice Stripping
+            $sqlJobStripping = "
+                SELECT j.*
+                FROM tppjobplp j
+                WHERE j.idCont_FK = :idCont
+                  AND j.jobType LIKE '%Stripping%'
+                ORDER BY j.idJob DESC
+                LIMIT 1
+            ";
+            $stmtJStr = $pdo_tpp->prepare($sqlJobStripping);
+            $stmtJStr->execute([':idCont' => $idCont]);
+            $jobStripping = $stmtJStr->fetch(PDO::FETCH_ASSOC);
+
             $sqlStripping = "
                 SELECT inv.*
                 FROM tppinvcontplp ic
@@ -594,7 +638,33 @@ if ($action === 'get_container_timeline') {
             $stmtStr->execute([':idCont' => $idCont]);
             $stripping = $stmtStr->fetch(PDO::FETCH_ASSOC);
 
-            // 4. Query Invoice Pengeluaran / SPPB Delivery
+            // 5. Query Job Out PLP (Truk Masuk Penjemput) dari tppjobplp
+            $sqlJobOut = "
+                SELECT j.*
+                FROM tppjobplp j
+                WHERE j.idCont_FK = :idCont
+                  AND j.jobType = 'Job Out PLP'
+                ORDER BY j.idJob DESC
+                LIMIT 1
+            ";
+            $stmtJOut = $pdo_tpp->prepare($sqlJobOut);
+            $stmtJOut->execute([':idCont' => $idCont]);
+            $jobOut = $stmtJOut->fetch(PDO::FETCH_ASSOC);
+
+            // 6. Query Surat Jalan PLP (Truk Penjemput, Pickup & Gate Out)
+            $sqlSJ = "
+                SELECT *
+                FROM tppsuratjalan
+                WHERE idManifest = :idCont
+                  AND typeManifest = 'PLP'
+                ORDER BY idSuratJalan DESC
+                LIMIT 1
+            ";
+            $stmtSJ = $pdo_tpp->prepare($sqlSJ);
+            $stmtSJ->execute([':idCont' => $idCont]);
+            $sj = $stmtSJ->fetch(PDO::FETCH_ASSOC);
+
+            // 7. Query Invoice Pengeluaran / SPPB Delivery
             $sqlDeliveryInv = "
                 SELECT inv.*
                 FROM tppinvcontplp ic
@@ -610,21 +680,8 @@ if ($action === 'get_container_timeline') {
             $stmtDel->execute([':idCont' => $idCont]);
             $deliveryInv = $stmtDel->fetch(PDO::FETCH_ASSOC);
 
-            // 5. Query Surat Jalan (Truck In Penjemput & Out Trailer Gate Out)
-            $sqlSJ = "
-                SELECT *
-                FROM tppsuratjalan
-                WHERE idManifest = :idCont
-                  AND typeManifest = 'PLP'
-                ORDER BY idSuratJalan DESC
-                LIMIT 1
-            ";
-            $stmtSJ = $pdo_tpp->prepare($sqlSJ);
-            $stmtSJ->execute([':idCont' => $idCont]);
-            $sj = $stmtSJ->fetch(PDO::FETCH_ASSOC);
-
-            // Evaluasi Dokumen Pengeluaran Pabean (Alur 5 & 6) berdasarkan Referensi_Kode_Dokumen_TPS.pdf
-            $kodeDokOut = '99'; // Default: 99 = Dokumen Pengeluaran Lainnya....
+            // Evaluasi Dokumen Pengeluaran Pabean (Alur 6, 7 & 8) berdasarkan Referensi_Kode_Dokumen_TPS.pdf
+            $kodeDokOut = '99'; // Default: 99 = Dokumen Pengeluaran Lainnya
             $namaDokOut = 'Dokumen Pengeluaran Lainnya (Surat Jalan)';
             $noDokOut = $sj ? trim((string)$sj['noSuratJalan']) : '';
             $tglDokOut = $sj ? $formatDmy($sj['tglSuratJalan'] ?: $sj['cetak']) : '';
@@ -705,15 +762,88 @@ if ($action === 'get_container_timeline') {
                 $tglDokOut = $sppbTgl ?: ($pibTgl ?: $tglDokOut);
             }
 
-            // Susun 6 Alur Riwayat Kontainer TPP
+            // 8. Query Autogate Records dari primamas.gate_log (Koneksi database primamas)
+            // Pemetaan alur operasional gerbang fisik:
+            // - typeqr = 'A' AND id_gate = 'IN1' : Trailer/truck bawa kontainer PLP masuk depo (Gate In PLP)
+            // - typeqr = 'A' AND id_gate = 'OUT1': Trailer/truck kosong keluar depo setelah Stacking Discharge di Yard
+            // - typeqr = 'B' AND id_gate = 'IN1' : Trailer/truck kosong masuk depo jemput kontainer pengeluaran (Truck In Lini 2)
+            // - Lapangan (antara IN1 & OUT1)     : Kontainer dinaikkan ke atas sasis trailer di yard (Pickup Lini 2)
+            // - typeqr = 'B' AND id_gate = 'OUT1': Trailer/truck bawa kontainer keluar depo (Gate Out Lini 2)
+            $gateLogA_In = null;
+            $gateLogA_Out = null;
+            $gateLogB_In = null;
+            $gateLogB_Out = null;
+
+            if ($pdo_primamas) {
+                try {
+                    $stmtGL = $pdo_primamas->prepare("
+                        SELECT id, barcode, typeqr, id_gate, date_record, Nopol, status_bc 
+                        FROM gate_log 
+                        WHERE REPLACE(REPLACE(contno, ' ', ''), '-', '') = :noCont 
+                        ORDER BY id ASC
+                    ");
+                    $stmtGL->execute([':noCont' => $noContClean]);
+                    $allGateLogs = $stmtGL->fetchAll(PDO::FETCH_ASSOC);
+
+                    // Saring record sesuai siklus kedatangan kontainer saat ini
+                    $tglInTime = !empty($cont['tglInDepo']) ? strtotime($cont['tglInDepo']) : 0;
+                    $cycleLogs = [];
+                    if ($tglInTime > 0) {
+                        $minTime = $tglInTime - (2 * 86400); // toleransi 2 hari sebelum tglInDepo
+                        foreach ($allGateLogs as $gl) {
+                            if (!empty($gl['date_record']) && strtotime($gl['date_record']) >= $minTime) {
+                                $cycleLogs[] = $gl;
+                            }
+                        }
+                    }
+                    if (empty($cycleLogs)) {
+                        $cycleLogs = $allGateLogs;
+                    }
+
+                    foreach ($cycleLogs as $row) {
+                        $tqr = strtoupper(trim((string)($row['typeqr'] ?? '')));
+                        $gate = strtoupper(trim((string)($row['id_gate'] ?? '')));
+
+                        if ($tqr === 'A' && $gate === 'IN1' && !$gateLogA_In) {
+                            $gateLogA_In = $row;
+                        } elseif ($tqr === 'A' && $gate === 'OUT1' && !$gateLogA_Out) {
+                            $gateLogA_Out = $row;
+                        } elseif ($tqr === 'B' && $gate === 'IN1' && !$gateLogB_In) {
+                            $gateLogB_In = $row;
+                        } elseif ($tqr === 'B' && $gate === 'OUT1' && !$gateLogB_Out) {
+                            $gateLogB_Out = $row;
+                        }
+                    }
+                } catch (Exception $eGL) {
+                    error_log("Error query primamas.gate_log: " . $eGL->getMessage());
+                }
+            }
+
+            // Susun Alur Riwayat Kontainer TPP (PLP)
             $timeline = [];
 
             // -------------------------------------------------------------
-            // ALUR 1: GATE IN PLP (IN TRAILER TRUK MASUK)
+            // ALUR 1: GATE IN PLP (IN TRAILER TRUK MASUK) - KODE 5
+            // Kondisi primamas.gate_log: typeqr = 'A' AND id_gate = 'IN1'
+            // (Trailer/truck membawa kontainer PLP masuk dari Lini 1 ke Depo TPP)
             // -------------------------------------------------------------
-            $waktuGateIn = $formatDmyHis($cont['tglInDepo']);
+            $waktuGateIn = '';
+            $nopolIn = '';
+            $isGateInAutogate = false;
+
+            if ($gateLogA_In && !empty($gateLogA_In['date_record'])) {
+                $waktuGateIn = $formatDmyHis($gateLogA_In['date_record']);
+                $nopolIn = trim((string)$gateLogA_In['Nopol']);
+                $isGateInAutogate = true;
+            }
+            if (empty($waktuGateIn) && !empty($cont['tglInDepo'])) {
+                $waktuGateIn = $formatDmyHis($cont['tglInDepo']);
+            }
+            if (empty($nopolIn) && !empty($cont['NoPolIn'])) {
+                $nopolIn = trim((string)$cont['NoPolIn']);
+            }
             $hasGateIn = !empty($waktuGateIn);
-            $nopolIn = trim((string)$cont['NoPolIn']);
+
             $noPlpDoc = $cont['noPLP'] ?: ($cont['NoBC11'] ?: '');
             $tglPlpDoc = $formatDmy($cont['tglPLP'] ?: $cont['tglBC11']);
             $noBl = $cont['NO_MASTER_BL_AWB'] ?: '';
@@ -722,33 +852,40 @@ if ($action === 'get_container_timeline') {
             // Sanitasi lokasi block untuk OpenAPI CEISA 4.0 (max 10 karakter)
             $yardBlockClean = trim((string)$cont['location']);
             if (strlen($yardBlockClean) > 10) {
-                $yardBlockClean = trim(preg_replace('/^blok\s+/i', '', $yardBlockClean));
-                if (strlen($yardBlockClean) > 10) {
-                    $yardBlockClean = substr($yardBlockClean, 0, 10);
+                $yardBlockClean = substr($yardBlockClean, 0, 10);
+            }
+            $yardSlotClean = !empty($cont['slot']) ? trim((string)$cont['slot']) : '1';
+            $yardTierClean = !empty($cont['tier']) ? trim((string)$cont['tier']) : '1';
+
+            $payload1 = null;
+            if ($hasGateIn) {
+                $payload1 = [
+                    'departemen'      => 'TPP',
+                    'nomorKontainer'  => $noContClean,
+                    'ukuranKontainer' => $contSize,
+                    'jenisKontainer'  => $contStatus,
+                    'kodeTps'         => 'PSU0',
+                    'kodeGudang'      => 'CPSU',
+                    'kodeKegiatan'    => 5,
+                    'waktuKegiatan'   => $waktuGateIn
+                ];
+                if ($nopolIn) $payload1['nomorPolisi'] = $nopolIn;
+                if ($noPlpDoc) {
+                    $payload1['kodeDokumen'] = '3';
+                    $payload1['nomorDokumen'] = $noPlpDoc;
+                    if ($tglPlpDoc) $payload1['tanggalDokumen'] = $tglPlpDoc;
+                }
+                if ($noBl) {
+                    $payload1['nomorBlAwb'] = $noBl;
+                    if ($tglBl) $payload1['tanggalBlAwb'] = $tglBl;
                 }
             }
 
-            $payload1 = [
-                'departemen'      => 'TPP',
-                'nomorKontainer'  => $noContClean,
-                'ukuranKontainer' => $contSize,
-                'jenisKontainer'  => $contStatus,
-                'kodeTps'         => 'PSU0',
-                'kodeGudang'      => 'CPSU',
-                'kodeKegiatan'    => 5,
-                'waktuKegiatan'   => $waktuGateIn
-            ];
-            if ($nopolIn) $payload1['nomorPolisi'] = $nopolIn;
-            // Catatan: Pada Gate In PLP kontainer masih di atas trailer masuk (In Trailer), belum ditempatkan di yard (block/slot/tier tidak dikirim)
-            if ($noPlpDoc) {
-                $payload1['kodeDokumen'] = '3'; // Referensi PDF: Kode 3 = PLP - Dok. PLP/OB (A11)
-                $payload1['nomorDokumen'] = $noPlpDoc;
-                if ($tglPlpDoc) $payload1['tanggalDokumen'] = $tglPlpDoc;
-            }
-            if ($noBl) {
-                $payload1['nomorBlAwb'] = $noBl;
-                if ($tglBl) $payload1['tanggalBlAwb'] = $tglBl;
-            }
+            $deskripsi1 = $hasGateIn
+                ? ($isGateInAutogate
+                    ? "Trailer membawa kontainer PLP masuk depo via Autogate (Scan Type A IN1" . ($nopolIn ? ", Nopol: {$nopolIn}" : "") . ")"
+                    : "Truk masuk membawa kontainer dari Lini 1 ke Depo TPP (Waktu In Depo: {$waktuGateIn})")
+                : 'Kontainer belum masuk / tglInDepo kosong';
 
             $timeline[] = [
                 'step'            => 1,
@@ -757,46 +894,76 @@ if ($action === 'get_container_timeline') {
                 'icon'            => '🚚',
                 'badgeCategory'   => 'Masuk Depo',
                 'available'       => $hasGateIn,
-                'waktuKegiatan'   => $waktuGateIn,
+                'waktuKegiatan'   => $waktuGateIn ?: '-',
                 'nomorPolisi'     => $nopolIn,
                 'nopolLabel'      => $nopolIn ? "In Trailer: {$nopolIn}" : '-',
                 'kodeDokumen'     => '3',
                 'namaDokumen'     => 'PLP - Dok. PLP/OB (A11)',
-                'dokumenLabel'    => $noPlpDoc ? "PLP (Kode 3): {$noPlpDoc}" : ($noBl ? "B/L: {$noBl}" : '-'),
-                'lokasiYard'      => '-', // Kontainer masih di trailer, belum di yard
-                'deskripsi'       => "Truk masuk membawa kontainer dari Lini 1 ke Depo TPP (Waktu In Depo: {$waktuGateIn})",
+                'dokumenLabel'    => $noPlpDoc ? "PLP (Kode 3): {$noPlpDoc}" : '-',
+                'lokasiYard'      => '-',
+                'deskripsi'       => $deskripsi1,
                 'is_sent'         => isset($sentKegiatan[5]),
                 'sent_info'       => $sentKegiatan[5] ?? null,
-                'payload'         => $hasGateIn ? $payload1 : null
+                'payload'         => $payload1
             ];
 
             // -------------------------------------------------------------
-            // ALUR 2: STACKING DISCHARGE LINI 2 (PENUMPUKAN YARD)
+            // ALUR 2: STACKING DISCHARGE LINI 2 (PENUMPUKAN YARD) - KODE 17
+            // Sumber data:
+            // 1. primamas.gate_log: typeqr = 'A' AND id_gate = 'OUT1' (Trailer kosong keluar setelah stacking selesai)
+            // 2. tppcontplp.tglOUT_truckingKosong: waktu truk pengantar keluar kosong setelah menurunkan kontainer di yard
+            // Catatan: Gate In PLP SELALU LEBIH DULU dibanding Stacking Discharge Lapangan!
             // -------------------------------------------------------------
-            $waktuStacking = $waktuGateIn;
-            $hasStacking = $hasGateIn;
-            $payload2 = [
-                'departemen'      => 'TPP',
-                'nomorKontainer'  => $noContClean,
-                'ukuranKontainer' => $contSize,
-                'jenisKontainer'  => $contStatus,
-                'kodeTps'         => 'PSU0',
-                'kodeGudang'      => 'CPSU',
-                'kodeKegiatan'    => 17,
-                'waktuKegiatan'   => $waktuStacking
-            ];
-            if ($yardBlockClean) $payload2['block'] = $yardBlockClean;
-            if ($cont['slot']) $payload2['slot'] = substr(trim((string)$cont['slot']), 0, 5);
-            if ($cont['tier']) $payload2['tier'] = substr(trim((string)$cont['tier']), 0, 5);
-            if ($noPlpDoc) {
-                $payload2['kodeDokumen'] = '3'; // Referensi PDF: Kode 3 = PLP - Dok. PLP/OB (A11)
-                $payload2['nomorDokumen'] = $noPlpDoc;
-                if ($tglPlpDoc) $payload2['tanggalDokumen'] = $tglPlpDoc;
+            $hasStacking = !empty($yardBlockClean);
+            $waktuStacking = '';
+            $isStackingAutogate = false;
+
+            if ($gateLogA_Out && !empty($gateLogA_Out['date_record'])) {
+                $waktuStacking = $formatDmyHis($gateLogA_Out['date_record']);
+                $isStackingAutogate = true;
+            } elseif (!empty($cont['tglOUT_truckingKosong']) && $cont['tglOUT_truckingKosong'] !== '0000-00-00 00:00:00') {
+                $waktuStacking = $formatDmyHis($cont['tglOUT_truckingKosong']);
+            } elseif ($hasGateIn) {
+                // Jika tglOUT_truckingKosong kosong, beri estimasi jeda realistis 5 menit setelah Gate In
+                $tIn = strtotime($waktuGateIn);
+                $waktuStacking = $tIn ? date('d-m-Y H:i:s', $tIn + 300) : $waktuGateIn;
+            } else {
+                $waktuStacking = date('d-m-Y H:i:s');
             }
-            if ($noBl) {
-                $payload2['nomorBlAwb'] = $noBl;
-                if ($tglBl) $payload2['tanggalBlAwb'] = $tglBl;
+
+            $payload2 = null;
+            if ($hasStacking) {
+                $payload2 = [
+                    'departemen'      => 'TPP',
+                    'nomorKontainer'  => $noContClean,
+                    'ukuranKontainer' => $contSize,
+                    'jenisKontainer'  => $contStatus,
+                    'kodeTps'         => 'PSU0',
+                    'kodeGudang'      => 'CPSU',
+                    'kodeKegiatan'    => 17,
+                    'waktuKegiatan'   => $waktuStacking,
+                    'block'           => $yardBlockClean,
+                    'slot'            => $yardSlotClean,
+                    'tier'            => $yardTierClean
+                ];
+                if ($noPlpDoc) {
+                    $payload2['kodeDokumen'] = '3';
+                    $payload2['nomorDokumen'] = $noPlpDoc;
+                    if ($tglPlpDoc) $payload2['tanggalDokumen'] = $tglPlpDoc;
+                }
+                if ($noBl) {
+                    $payload2['nomorBlAwb'] = $noBl;
+                    if ($tglBl) $payload2['tanggalBlAwb'] = $tglBl;
+                }
             }
+
+            $deskripsi2 = $hasStacking
+                ? ($isStackingAutogate
+                    ? "Penumpukan di yard (" . ($cont['location'] ?: 'Yard Lapangan') . ") selesai & trailer keluar kosong (Scan Type A OUT1)"
+                    : (!empty($cont['tglOUT_truckingKosong']) && $cont['tglOUT_truckingKosong'] !== '0000-00-00 00:00:00'
+                        ? "Penumpukan di yard (" . ($cont['location'] ?: 'Yard Lapangan') . ") selesai & trailer keluar kosong (tglOUT_truckingKosong)"
+                        : "Penempatan kontainer di yard depo (" . ($cont['location'] ?: 'Yard Lapangan') . ")"))
+                : 'Lokasi yard belum ditentukan';
 
             $timeline[] = [
                 'step'            => 2,
@@ -805,36 +972,45 @@ if ($action === 'get_container_timeline') {
                 'icon'            => '🏗️',
                 'badgeCategory'   => 'Yard Stacking',
                 'available'       => $hasStacking,
-                'waktuKegiatan'   => $waktuStacking,
+                'waktuKegiatan'   => $hasStacking ? $waktuStacking : '-',
                 'nomorPolisi'     => '',
                 'nopolLabel'      => '-',
                 'kodeDokumen'     => '3',
                 'namaDokumen'     => 'PLP - Dok. PLP/OB (A11)',
                 'dokumenLabel'    => $noPlpDoc ? "PLP (Kode 3): {$noPlpDoc}" : '-',
-                'lokasiYard'      => $cont['location'] ?: 'Blok Yard Depo',
-                'deskripsi'       => "Penempatan kontainer di yard depo (" . ($cont['location'] ?: 'Yard Lapangan') . ")",
+                'lokasiYard'      => $yardBlockClean ?: '-',
+                'deskripsi'       => $deskripsi2,
                 'is_sent'         => isset($sentKegiatan[17]),
                 'sent_info'       => $sentKegiatan[17] ?? null,
-                'payload'         => $hasStacking ? $payload2 : null
+                'payload'         => $payload2
             ];
 
             // -------------------------------------------------------------
-            // ALUR 3: BEHANDLE LINI 2 (PEMERIKSAAN FISIK PABEAN)
+            // ALUR 3: BEHANDLE LINI 2 (PEMERIKSAAN FISIK) - KODE 21
+            // Waktu kegiatan diambil dari saat Job Behandle dibuat (tglJob)
             // -------------------------------------------------------------
-            $waktuBehandle = '';
-            $docBehandle = '';
-            $tglDocBehandle = '';
             $hasBehandle = false;
+            $waktuBehandle = '';
+            $docBehandle = $noPlpDoc;
+            $tglDocBehandle = $tglPlpDoc;
+            $kdDokBehandle = '3';
+            $petugasBehandle = '';
 
-            if ($behandle) {
+            if ($jobBehandle && !empty($jobBehandle['tglJob'])) {
+                $hasBehandle = true;
+                $waktuBehandle = $formatDmyHis($jobBehandle['tglJob']);
+                $petugasBehandle = trim((string)($jobBehandle['operator'] ?: ($jobBehandle['user'] ?: 'Petugas Lapangan')));
+            } elseif ($behandle) {
+                // Fallback jika hanya ada rekaman invoice behandle
+                $hasBehandle = true;
                 $waktuBehandle = $formatDmyHis($behandle['inputTime'] ?: ($behandle['tglInvPLP'] . ' 09:00:00'));
-                $docBehandle = $behandle['noSPPB'] ?: ($behandle['noInvPLP'] ?: '');
-                $tglDocBehandle = $formatDmy($behandle['tglSPPB'] ?: $behandle['tglInvPLP']);
-                $hasBehandle = true;
+                $docBehandle = $behandle['noSPPB'] ?: ($behandle['noInvPLP'] ?: $noPlpDoc);
+                $tglDocBehandle = $formatDmy($behandle['tglSPPB'] ?: $behandle['tglInvPLP']) ?: $tglPlpDoc;
+                $kdDokBehandle = $behandle['noSPPB'] ? '8' : '3';
             } elseif (!empty($cont['updateby_date']) && $cont['updateby_date'] !== '0000-00-00 00:00:00') {
-                $waktuBehandle = $formatDmyHis($cont['updateby_date']);
-                $docBehandle = 'Buka Segel / P2';
                 $hasBehandle = true;
+                $waktuBehandle = $formatDmyHis($cont['updateby_date']);
+                $petugasBehandle = trim((string)($cont['updateby_name'] ?: ($cont['updateby'] ?: 'P2')));
             }
 
             $payload3 = null;
@@ -847,15 +1023,17 @@ if ($action === 'get_container_timeline') {
                     'kodeTps'         => 'PSU0',
                     'kodeGudang'      => 'CPSU',
                     'kodeKegiatan'    => 21,
-                    'waktuKegiatan'   => $waktuBehandle
+                    'waktuKegiatan'   => $waktuBehandle,
+                    'block'           => $yardBlockClean ?: 'BLOK BHD',
+                    'slot'            => $yardSlotClean ?: '1',
+                    'tier'            => $yardTierClean ?: '1',
+                    'kodeDokumen'     => $kdDokBehandle,
+                    'nomorDokumen'    => $docBehandle ?: $noPlpDoc
                 ];
-                // Referensi PDF: Kode 8 = PPB - Dok. Periksa Fisik
-                $payload3['kodeDokumen'] = '8';
-                $payload3['nomorDokumen'] = $docBehandle ?: ($noPlpDoc ?: 'PPB/BEHANDLE');
-                if ($tglDocBehandle) {
-                    $payload3['tanggalDokumen'] = $tglDocBehandle;
-                } elseif ($tglPlpDoc) {
-                    $payload3['tanggalDokumen'] = $tglPlpDoc;
+                if ($tglDocBehandle) $payload3['tanggalDokumen'] = $tglDocBehandle;
+                if ($noBl) {
+                    $payload3['nomorBlAwb'] = $noBl;
+                    if ($tglBl) $payload3['tanggalBlAwb'] = $tglBl;
                 }
             }
 
@@ -869,33 +1047,34 @@ if ($action === 'get_container_timeline') {
                 'waktuKegiatan'   => $waktuBehandle ?: '-',
                 'nomorPolisi'     => '',
                 'nopolLabel'      => '-',
-                'kodeDokumen'     => '8',
-                'namaDokumen'     => 'PPB - Dok. Periksa Fisik',
-                'dokumenLabel'    => $docBehandle ? "PPB (Kode 8): {$docBehandle}" : ($noPlpDoc ? "PLP (Kode 3): {$noPlpDoc}" : '-'),
-                'lokasiYard'      => '-',
-                'deskripsi'       => $hasBehandle ? "Pemeriksaan fisik pabean / buka segel (" . ($behandle['invType'] ?? 'Behandle') . ")" : 'Pemeriksaan fisik belum dilaksanakan / tidak ada data Behandle',
+                'kodeDokumen'     => $kdDokBehandle,
+                'namaDokumen'     => $kdDokBehandle === '8' ? 'PPB - Dok. Periksa Fisik' : 'PLP - Dok. PLP/OB (A11)',
+                'dokumenLabel'    => $docBehandle ? "PLP/SPJM: {$docBehandle}" : ($noPlpDoc ? "PLP: {$noPlpDoc}" : '-'),
+                'lokasiYard'      => $yardBlockClean ?: '-',
+                'deskripsi'       => $hasBehandle ? ("Pemeriksaan fisik pabean / Behandle" . ($petugasBehandle ? " (Pelaksana: {$petugasBehandle})" : "")) : 'Pemeriksaan fisik belum dilaksanakan / tidak ada Job Behandle',
                 'is_sent'         => isset($sentKegiatan[21]),
                 'sent_info'       => $sentKegiatan[21] ?? null,
                 'payload'         => $payload3
             ];
 
             // -------------------------------------------------------------
-            // ALUR 4: STRIPPING STUFFING LINI 2 (BONGKAR KARGO)
+            // ALUR 4: SHIFTING LINI 2 (PERGESERAN POSISI YARD) - KODE 22
+            // Membaca log audit container_position_logs dari modul Yard_Position
             // -------------------------------------------------------------
-            $waktuStripping = '';
-            $docStripping = '';
-            $tglDocStripping = '';
-            $hasStripping = false;
-
-            if ($stripping) {
-                $waktuStripping = $formatDmyHis($stripping['inputTime'] ?: ($stripping['tglInvPLP'] . ' 08:30:00'));
-                $docStripping = $stripping['noInvPLP'] ?: ($stripping['noSPPB'] ?: '');
-                $tglDocStripping = $formatDmy($stripping['tglInvPLP'] ?: $stripping['tglSPPB']);
-                $hasStripping = true;
+            $hasShifting = !empty($shiftLog);
+            $waktuShifting = $hasShifting ? $formatDmyHis($shiftLog['created_at']) : '';
+            $shiftBlock = $hasShifting ? trim((string)$shiftLog['to_block']) : '';
+            if (strlen($shiftBlock) > 10) {
+                $shiftBlock = substr($shiftBlock, 0, 10);
             }
+            $shiftSlot = $hasShifting && !empty($shiftLog['to_slot']) ? trim((string)$shiftLog['to_slot']) : '1';
+            $shiftTier = $hasShifting && !empty($shiftLog['to_tier']) ? trim((string)$shiftLog['to_tier']) : '1';
+            $fromBlockDesc = $hasShifting ? trim((string)($shiftLog['from_block'] ?: '-')) : '';
+            $toBlockDesc = $hasShifting ? trim((string)($shiftLog['to_block'] ?: '-')) : '';
+            $operatorShift = $hasShifting ? trim((string)($shiftLog['operator_id'] ?: 'Krani Lapangan')) : '';
 
             $payload4 = null;
-            if ($hasStripping) {
+            if ($hasShifting) {
                 $payload4 = [
                     'departemen'      => 'TPP',
                     'nomorKontainer'  => $noContClean,
@@ -903,23 +1082,89 @@ if ($action === 'get_container_timeline') {
                     'jenisKontainer'  => $contStatus,
                     'kodeTps'         => 'PSU0',
                     'kodeGudang'      => 'CPSU',
-                    'kodeKegiatan'    => 23,
-                    'waktuKegiatan'   => $waktuStripping
+                    'kodeKegiatan'    => 22,
+                    'waktuKegiatan'   => $waktuShifting,
+                    'block'           => $shiftBlock ?: ($yardBlockClean ?: 'YARD'),
+                    'slot'            => $shiftSlot ?: '1',
+                    'tier'            => $shiftTier ?: '1',
+                    'kodeDokumen'     => '3',
+                    'nomorDokumen'    => $noPlpDoc
                 ];
-                // Referensi PDF: Kode 3 = PLP - Dok. PLP/OB (A11) (Persetujuan Stripping Lini 2)
-                $payload4['kodeDokumen'] = '3';
-                $payload4['nomorDokumen'] = $noPlpDoc ?: ($docStripping ?: 'PLP/STRIPPING');
-                if ($tglPlpDoc) {
-                    $payload4['tanggalDokumen'] = $tglPlpDoc;
-                } elseif ($tglDocStripping) {
-                    $payload4['tanggalDokumen'] = $tglDocStripping;
+                if ($tglPlpDoc) $payload4['tanggalDokumen'] = $tglPlpDoc;
+                if ($noBl) {
+                    $payload4['nomorBlAwb'] = $noBl;
+                    if ($tglBl) $payload4['tanggalBlAwb'] = $tglBl;
+                }
+            }
+
+            $timeline[] = [
+                'step'            => 4,
+                'kodeKegiatan'    => 22,
+                'kegiatanLabel'   => 'Shifting Lini 2 (Pergeseran Posisi Yard)',
+                'icon'            => '🔄',
+                'badgeCategory'   => 'Relokasi Yard',
+                'available'       => $hasShifting,
+                'waktuKegiatan'   => $waktuShifting ?: '-',
+                'nomorPolisi'     => '',
+                'nopolLabel'      => '-',
+                'kodeDokumen'     => '3',
+                'namaDokumen'     => 'PLP - Dok. PLP/OB (A11)',
+                'dokumenLabel'    => $noPlpDoc ? "PLP (Kode 3): {$noPlpDoc}" : '-',
+                'lokasiYard'      => $shiftBlock ?: ($yardBlockClean ?: '-'),
+                'deskripsi'       => $hasShifting ? "Pergeseran posisi kontainer: {$fromBlockDesc} ➜ {$toBlockDesc} (Operator: {$operatorShift})" : 'Tidak ada riwayat pergeseran/shifting posisi di yard',
+                'is_sent'         => isset($sentKegiatan[22]),
+                'sent_info'       => $sentKegiatan[22] ?? null,
+                'payload'         => $payload4
+            ];
+
+            // -------------------------------------------------------------
+            // ALUR 5: STRIPPING STUFFING LINI 2 (BONGKAR KARGO) - KODE 23
+            // Waktu kegiatan diambil dari saat Job Stripping dibuat (tglJob)
+            // -------------------------------------------------------------
+            $hasStripping = false;
+            $waktuStripping = '';
+            $docStripping = '';
+            $tglDocStripping = '';
+            $petugasStripping = '';
+
+            if ($jobStripping && !empty($jobStripping['tglJob'])) {
+                $hasStripping = true;
+                $waktuStripping = $formatDmyHis($jobStripping['tglJob']);
+                $docStripping = $noPlpDoc;
+                $tglDocStripping = $tglPlpDoc;
+                $petugasStripping = trim((string)($jobStripping['operator'] ?: ($jobStripping['user'] ?: 'Petugas Lapangan')));
+            } elseif ($stripping) {
+                $hasStripping = true;
+                $waktuStripping = $formatDmyHis($stripping['inputTime'] ?: ($stripping['tglInvPLP'] . ' 10:00:00'));
+                $docStripping = $stripping['noSPPB'] ?: ($stripping['noInvPLP'] ?: $noPlpDoc);
+                $tglDocStripping = $formatDmy($stripping['tglSPPB'] ?: $stripping['tglInvPLP']) ?: $tglPlpDoc;
+            }
+
+            $payload5 = null;
+            if ($hasStripping) {
+                $payload5 = [
+                    'departemen'      => 'TPP',
+                    'nomorKontainer'  => $noContClean,
+                    'ukuranKontainer' => $contSize,
+                    'jenisKontainer'  => $contStatus,
+                    'kodeTps'         => 'PSU0',
+                    'kodeGudang'      => 'CPSU',
+                    'kodeKegiatan'    => 23,
+                    'waktuKegiatan'   => $waktuStripping,
+                    'kodeDokumen'     => '3',
+                    'nomorDokumen'    => $docStripping ?: $noPlpDoc
+                ];
+                if ($tglDocStripping) $payload5['tanggalDokumen'] = $tglDocStripping;
+                if ($noBl) {
+                    $payload5['nomorBlAwb'] = $noBl;
+                    if ($tglBl) $payload5['tanggalBlAwb'] = $tglBl;
                 }
             }
 
             $cargoNote = $stripping ? trim(($stripping['jumlah'] ? $stripping['jumlah'] . ' ' . $stripping['satuan'] : '') . ' ' . ($stripping['namaBarang'] ?? '')) : '';
 
             $timeline[] = [
-                'step'            => 4,
+                'step'            => 5,
                 'kodeKegiatan'    => 23,
                 'kegiatanLabel'   => 'Stripping Stuffing Lini 2 (Bongkar Kargo)',
                 'icon'            => '📦',
@@ -930,34 +1175,36 @@ if ($action === 'get_container_timeline') {
                 'nopolLabel'      => '-',
                 'kodeDokumen'     => '3',
                 'namaDokumen'     => 'PLP - Dok. PLP/OB (A11)',
-                'dokumenLabel'    => $docStripping ? "PLP / Inv: {$docStripping}" : ($noPlpDoc ? "PLP (Kode 3): {$noPlpDoc}" : '-'),
+                'dokumenLabel'    => $docStripping ? "PLP/Stripping: {$docStripping}" : ($noPlpDoc ? "PLP: {$noPlpDoc}" : '-'),
                 'lokasiYard'      => '-',
-                'deskripsi'       => $hasStripping ? "Pembongkaran muatan kargo (" . ($cargoNote ? substr($cargoNote, 0, 45) . '...' : 'Stripping PLP') . ")" : 'Bongkar kargo belum dilaksanakan / tidak ada data Stripping',
+                'deskripsi'       => $hasStripping ? ("Pembongkaran muatan kargo di depo" . ($petugasStripping ? " (Pelaksana: {$petugasStripping})" : ($cargoNote ? " ({$cargoNote})" : ''))) : 'Bongkar kargo belum dilaksanakan / tidak ada Job Stripping',
                 'is_sent'         => isset($sentKegiatan[23]),
                 'sent_info'       => $sentKegiatan[23] ?? null,
-                'payload'         => $payload4
+                'payload'         => $payload5
             ];
 
             // -------------------------------------------------------------
-            // ALUR 5: TRUCK IN PENJEMPUT / PICKUP LINI 2
+            // ALUR 6: TRUCK IN LINI 2 (TRUK PENJEMPUT MASUK) - KODE 19
+            // Sumber: primamas.gate_log dengan typeqr = 'B' AND id_gate = 'IN1'
+            // (Truk trailer kosong masuk gerbang depo untuk menjemput kontainer)
             // -------------------------------------------------------------
             $waktuTruckIn = '';
-            $nopolPenjemput = '';
-            $noSJ = '';
-            $tglSJ = '';
+            $nopolTruckIn = '';
             $hasTruckIn = false;
+            $noSJ = $sj ? trim((string)$sj['noSuratJalan']) : '';
 
-            if ($sj) {
-                $waktuTruckIn = $formatDmyHis($sj['tglIN_truckingKosong'] ?: ($sj['tglSuratJalan'] ?: $sj['cetak']));
-                $nopolPenjemput = trim((string)$sj['noPol']);
-                $noSJ = trim((string)$sj['noSuratJalan']);
-                $tglSJ = $formatDmy($sj['tglSuratJalan'] ?: $sj['cetak']);
-                $hasTruckIn = !empty($waktuTruckIn);
+            if ($gateLogB_In && !empty($gateLogB_In['date_record'])) {
+                $hasTruckIn = true;
+                $waktuTruckIn = $formatDmyHis($gateLogB_In['date_record']);
+                $nopolTruckIn = trim((string)$gateLogB_In['Nopol']);
+            }
+            if (empty($nopolTruckIn) && $sj && !empty($sj['noPol'])) {
+                $nopolTruckIn = trim((string)$sj['noPol']);
             }
 
-            $payload5 = null;
+            $payload6 = null;
             if ($hasTruckIn) {
-                $payload5 = [
+                $payload6 = [
                     'departemen'      => 'TPP',
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
@@ -967,49 +1214,124 @@ if ($action === 'get_container_timeline') {
                     'kodeKegiatan'    => 19, // 19 = TRUCK IN LINI 2
                     'waktuKegiatan'   => $waktuTruckIn
                 ];
-                if ($nopolPenjemput) $payload5['nomorPolisi'] = $nopolPenjemput;
-                // Dokumen Pengeluaran resmi sesuai Referensi_Kode_Dokumen_TPS.pdf
+                if ($nopolTruckIn) $payload6['nomorPolisi'] = $nopolTruckIn;
                 if ($noDokOut) {
-                    $payload5['kodeDokumen'] = $kodeDokOut;
-                    $payload5['nomorDokumen'] = $noDokOut;
-                    if ($tglDokOut) $payload5['tanggalDokumen'] = $tglDokOut;
+                    $payload6['kodeDokumen'] = $kodeDokOut;
+                    $payload6['nomorDokumen'] = $noDokOut;
+                    if ($tglDokOut) $payload6['tanggalDokumen'] = $tglDokOut;
+                }
+                if ($noBl) {
+                    $payload6['nomorBlAwb'] = $noBl;
+                    if ($tglBl) $payload6['tanggalBlAwb'] = $tglBl;
                 }
             }
 
+            $deskripsi6 = $hasTruckIn
+                ? ("Trailer kosong masuk depo untuk penjemputan kontainer via Autogate (Scan Type B IN1" . ($nopolTruckIn ? ", Nopol: {$nopolTruckIn}" : "") . ")")
+                : 'Belum ada catatan truk penjemput masuk via Autogate (Scan Type B IN1)';
+
             $timeline[] = [
-                'step'            => 5,
+                'step'            => 6,
                 'kodeKegiatan'    => 19,
-                'kegiatanLabel'   => 'Truck In Penjemput / Pickup Lini 2',
+                'kegiatanLabel'   => 'Truck In Lini 2 (Truk Masuk Penjemput)',
                 'icon'            => '🚛',
                 'badgeCategory'   => 'Armada Penjemput',
                 'available'       => $hasTruckIn,
                 'waktuKegiatan'   => $waktuTruckIn ?: '-',
-                'nomorPolisi'     => $nopolPenjemput,
-                'nopolLabel'      => $nopolPenjemput ? "Truk Penjemput: {$nopolPenjemput}" : '-',
+                'nomorPolisi'     => $nopolTruckIn,
+                'nopolLabel'      => $nopolTruckIn ? "Truk Penjemput: {$nopolTruckIn}" : '-',
                 'kodeDokumen'     => $kodeDokOut,
                 'namaDokumen'     => $namaDokOut,
                 'dokumenLabel'    => $noDokOut ? "{$namaDokOut} [Kode {$kodeDokOut}]: {$noDokOut}" : ($noSJ ? "SJ: {$noSJ}" : '-'),
-                'lokasiYard'      => '-',
-                'deskripsi'       => $hasTruckIn ? "Truk sasis kosong masuk depo untuk memuat kontainer (" . ($nopolPenjemput ?: 'Armada Penjemput') . ")" : 'Belum ada truk penjemput / Surat Jalan belum diterbitkan',
-                'is_sent'         => isset($sentKegiatan[19]) || isset($sentKegiatan[20]),
-                'sent_info'       => $sentKegiatan[19] ?? ($sentKegiatan[20] ?? null),
-                'payload'         => $payload5
+                'lokasiYard'      => '-', // Truk baru masuk pintu gerbang depo
+                'deskripsi'       => $deskripsi6,
+                'is_sent'         => isset($sentKegiatan[19]),
+                'sent_info'       => $sentKegiatan[19] ?? null,
+                'payload'         => $payload6
             ];
 
             // -------------------------------------------------------------
-            // ALUR 6: GATE OUT LINI 2 (OUT TRAILER TRUK KELUAR)
+            // ALUR 7: PICKUP LINI 2 (KONTAINER DIANGKAT KE SASIS TRUK) - KODE 20
+            // Sumber: Surat Jalan untuk PLP (tppsuratjalan)
+            // (Waktu saat kontainer dinaikkan ke sasis truk di yard & Surat Jalan diterbitkan)
+            // Posisi yard WAJIB KOSONG/NULL sesuai standar CEISA 4.0 Bab 8.2
             // -------------------------------------------------------------
-            $waktuGateOut = '';
-            $hasGateOut = false;
+            $waktuPickup = '';
+            $hasPickup = false;
+            $nopolPickup = $sj ? trim((string)$sj['noPol']) : ($nopolTruckIn ?: '');
 
-            if ($sj) {
-                $waktuGateOut = $formatDmyHis($sj['tglSuratJalan'] ?: ($sj['cetak'] ?: $sj['tglIN_truckingKosong']));
-                $hasGateOut = !empty($waktuGateOut);
+            if ($sj && (!empty($sj['tglIN_truckingKosong']) || !empty($sj['tglSuratJalan']) || !empty($sj['cetak']))) {
+                $hasPickup = true;
+                $waktuPickup = $formatDmyHis($sj['tglIN_truckingKosong'] ?: ($sj['tglSuratJalan'] ?: $sj['cetak']));
             }
 
-            $payload6 = null;
+            $payload7 = null;
+            if ($hasPickup) {
+                $payload7 = [
+                    'departemen'      => 'TPP',
+                    'nomorKontainer'  => $noContClean,
+                    'ukuranKontainer' => $contSize,
+                    'jenisKontainer'  => $contStatus,
+                    'kodeTps'         => 'PSU0',
+                    'kodeGudang'      => 'CPSU',
+                    'kodeKegiatan'    => 20, // 20 = PICKUP LINI 2
+                    'waktuKegiatan'   => $waktuPickup
+                ];
+                if ($nopolPickup) $payload7['nomorPolisi'] = $nopolPickup;
+                if ($noDokOut) {
+                    $payload7['kodeDokumen'] = $kodeDokOut;
+                    $payload7['nomorDokumen'] = $noDokOut;
+                    if ($tglDokOut) $payload7['tanggalDokumen'] = $tglDokOut;
+                }
+                if ($noBl) {
+                    $payload7['nomorBlAwb'] = $noBl;
+                    if ($tglBl) $payload7['tanggalBlAwb'] = $tglBl;
+                }
+            }
+
+            $timeline[] = [
+                'step'            => 7,
+                'kodeKegiatan'    => 20,
+                'kegiatanLabel'   => 'Pickup Lini 2 (Kontainer Naik ke Sasis Truk)',
+                'icon'            => '🏗️',
+                'badgeCategory'   => 'Lift On / Pickup',
+                'available'       => $hasPickup,
+                'waktuKegiatan'   => $waktuPickup ?: '-',
+                'nomorPolisi'     => $nopolPickup,
+                'nopolLabel'      => $nopolPickup ? "Armada: {$nopolPickup}" : '-',
+                'kodeDokumen'     => $kodeDokOut,
+                'namaDokumen'     => $namaDokOut,
+                'dokumenLabel'    => $noDokOut ? "{$namaDokOut} [Kode {$kodeDokOut}]: {$noDokOut}" : ($noSJ ? "SJ: {$noSJ}" : '-'),
+                'lokasiYard'      => '-', // Posisi yard WAJIB NULL (kontainer telah diangkat meninggalkan yard)
+                'deskripsi'       => $hasPickup ? ("Kontainer dinaikkan ke sasis truk di yard & Surat Jalan terbit (" . ($noSJ ?: 'SJ PLP') . ")") : 'Surat Jalan PLP belum terbit / kontainer belum di-pickup',
+                'is_sent'         => isset($sentKegiatan[20]),
+                'sent_info'       => $sentKegiatan[20] ?? null,
+                'payload'         => $payload7
+            ];
+
+            // -------------------------------------------------------------
+            // -------------------------------------------------------------
+            // ALUR 8: GATE OUT LINI 2 (OUT TRAILER TRUK KELUAR) - KODE 6
+            // Sumber: primamas.gate_log dengan typeqr = 'B' AND id_gate = 'OUT1'
+            // (Trailer/truck membawa kontainer keluar meninggalkan Depo TPP)
+            // Posisi yard WAJIB KOSONG/NULL
+            // -------------------------------------------------------------
+            $waktuGateOut = '';
+            $nopolGateOut = '';
+            $hasGateOut = false;
+
+            if ($gateLogB_Out && !empty($gateLogB_Out['date_record'])) {
+                $hasGateOut = true;
+                $waktuGateOut = $formatDmyHis($gateLogB_Out['date_record']);
+                $nopolGateOut = trim((string)$gateLogB_Out['Nopol']);
+            }
+            if (empty($nopolGateOut) && $sj && !empty($sj['noPol'])) {
+                $nopolGateOut = trim((string)$sj['noPol']);
+            }
+
+            $payload8 = null;
             if ($hasGateOut) {
-                $payload6 = [
+                $payload8 = [
                     'departemen'      => 'TPP',
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
@@ -1019,34 +1341,97 @@ if ($action === 'get_container_timeline') {
                     'kodeKegiatan'    => 6, // 6 = GATE OUT LINI 2
                     'waktuKegiatan'   => $waktuGateOut
                 ];
-                if ($nopolPenjemput) $payload6['nomorPolisi'] = $nopolPenjemput;
-                // Dokumen Pengeluaran resmi sesuai Referensi_Kode_Dokumen_TPS.pdf
+                if ($nopolGateOut) $payload8['nomorPolisi'] = $nopolGateOut;
                 if ($noDokOut) {
-                    $payload6['kodeDokumen'] = $kodeDokOut;
-                    $payload6['nomorDokumen'] = $noDokOut;
-                    if ($tglDokOut) $payload6['tanggalDokumen'] = $tglDokOut;
+                    $payload8['kodeDokumen'] = $kodeDokOut;
+                    $payload8['nomorDokumen'] = $noDokOut;
+                    if ($tglDokOut) $payload8['tanggalDokumen'] = $tglDokOut;
+                }
+                if ($noBl) {
+                    $payload8['nomorBlAwb'] = $noBl;
+                    if ($tglBl) $payload8['tanggalBlAwb'] = $tglBl;
                 }
             }
 
+            $deskripsi8 = $hasGateOut
+                ? ("Trailer membawa kontainer keluar meninggalkan depo via Autogate (Scan Type B OUT1" . ($nopolGateOut ? ", Nopol: {$nopolGateOut}" : "") . ")")
+                : 'Belum ada catatan truk keluar membawa kontainer via Autogate (Scan Type B OUT1)';
+
             $timeline[] = [
-                'step'            => 6,
+                'step'            => 8,
                 'kodeKegiatan'    => 6,
                 'kegiatanLabel'   => 'Gate Out Lini 2 (Out Trailer Truk Keluar)',
                 'icon'            => '🚚',
                 'badgeCategory'   => 'Keluar Depo',
                 'available'       => $hasGateOut,
                 'waktuKegiatan'   => $waktuGateOut ?: '-',
-                'nomorPolisi'     => $nopolPenjemput,
-                'nopolLabel'      => $nopolPenjemput ? "Out Trailer: {$nopolPenjemput}" : '-',
+                'nomorPolisi'     => $nopolGateOut,
+                'nopolLabel'      => $nopolGateOut ? "Out Trailer: {$nopolGateOut}" : '-',
                 'kodeDokumen'     => $kodeDokOut,
                 'namaDokumen'     => $namaDokOut,
                 'dokumenLabel'    => $noDokOut ? "{$namaDokOut} [Kode {$kodeDokOut}]: {$noDokOut}" : ($noSJ ? "SJ: {$noSJ}" : '-'),
-                'lokasiYard'      => '-', // Kosongkan posisi yard saat gate out
-                'deskripsi'       => $hasGateOut ? "Truk keluar membawa kontainer meninggalkan depo (Dokumen: {$namaDokOut} - {$noDokOut})" : 'Kontainer belum keluar / Surat Jalan belum terbit',
+                'lokasiYard'      => '-', // Posisi yard WAJIB NULL
+                'deskripsi'       => $deskripsi8,
                 'is_sent'         => isset($sentKegiatan[6]),
                 'sent_info'       => $sentKegiatan[6] ?? null,
-                'payload'         => $payload6
+                'payload'         => $payload8
             ];
+
+            // Urutkan riwayat alur operasional secara KRONOLOGIS berdasarkan waktuKegiatan sesungguhnya
+            $availSteps = [];
+            $unavailSteps = [];
+            foreach ($timeline as $st) {
+                if ($st['available'] && !empty($st['payload'])) {
+                    $availSteps[] = $st;
+                } else {
+                    $unavailSteps[] = $st;
+                }
+            }
+
+            $priorityOrder = [
+                5  => 1, // Gate In PLP
+                17 => 2, // Stacking Yard
+                21 => 3, // Behandle
+                23 => 4, // Stripping
+                22 => 5, // Shifting
+                19 => 6, // Truck In
+                20 => 7, // Pickup
+                6  => 8  // Gate Out
+            ];
+
+            usort($availSteps, function($a, $b) use ($priorityOrder) {
+                $timeA = 0;
+                $timeB = 0;
+                if (!empty($a['waktuKegiatan']) && $a['waktuKegiatan'] !== '-') {
+                    $dA = DateTime::createFromFormat('d-m-Y H:i:s', $a['waktuKegiatan']);
+                    $timeA = $dA ? $dA->getTimestamp() : strtotime($a['waktuKegiatan']);
+                }
+                if (!empty($b['waktuKegiatan']) && $b['waktuKegiatan'] !== '-') {
+                    $dB = DateTime::createFromFormat('d-m-Y H:i:s', $b['waktuKegiatan']);
+                    $timeB = $dB ? $dB->getTimestamp() : strtotime($b['waktuKegiatan']);
+                }
+
+                if ($timeA !== $timeB) {
+                    return $timeA <=> $timeB;
+                }
+
+                $pA = $priorityOrder[$a['kodeKegiatan']] ?? 99;
+                $pB = $priorityOrder[$b['kodeKegiatan']] ?? 99;
+                return $pA <=> $pB;
+            });
+
+            // Susun ulang nomor urut step sesuai urutan kronologis riil
+            $sortedTimeline = [];
+            $stepNum = 1;
+            foreach ($availSteps as $st) {
+                $st['step'] = $stepNum++;
+                $sortedTimeline[] = $st;
+            }
+            foreach ($unavailSteps as $st) {
+                $st['step'] = $stepNum++;
+                $sortedTimeline[] = $st;
+            }
+            $timeline = $sortedTimeline;
 
             jsonResp([
                 'success'    => true,
@@ -1059,7 +1444,7 @@ if ($action === 'get_container_timeline') {
                     'lokasiYard'      => $cont['location'] ?: '-',
                     'shipper'         => $cont['shipper'] ?: '-',
                     'inTrailer'       => $nopolIn ?: '-',
-                    'outTrailer'      => $nopolPenjemput ?: '-',
+                    'outTrailer'      => $nopolGateOut ?: ($nopolPickup ?: ($nopolTruckIn ?: '-')),
                     'suratPlp'        => $noPlpDoc ?: '-',
                     'noBl'            => $noBl ?: '-',
                     'dokumenPengeluaran' => ($noDokOut ? "{$namaDokOut} ({$noDokOut})" : '-')

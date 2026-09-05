@@ -20,6 +20,7 @@ $activeDept = strtolower($_GET['dept'] ?? 'tpp');
 if (!in_array($activeDept, ['tpp', 'gudang'])) {
     $activeDept = 'tpp';
 }
+$preloadCont = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $_GET['no_cont'] ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -1557,7 +1558,7 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
 
         function onKegiatanChange(val) {
             // Posisi Yard (Block/Slot/Tier) hanya relevan dan dikirimkan untuk kegiatan Penumpukan/Yard (Stacking/Shifting)
-            const isStackingActivity = ['10', '11', '15', '17', '18', '22', '24'].includes(val.toString());
+            const isStackingActivity = ['10', '11', '14', '15', '17', '18', '21', '22', '24'].includes(val.toString());
             if (!isStackingActivity) {
                 $('#block-loc').val('');
                 $('#slot-loc').val('');
@@ -1582,30 +1583,39 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                 } else {
                     $('#kode-dok').val('3');
                 }
+            } else if (val === '17' || val === '22') {
+                // 17 = Stacking Discharge Lini 2, 22 = Shifting Lini 2 -> TPP: 3 (Persetujuan PLP)
+                if (currentDept === 'tpp') {
+                    $('#kode-dok').val('3');
+                }
+            } else if (val === '21') {
+                // 21 = Behandle Lini 2 -> TPP: 3 (PLP) atau 8 (PPB)
+                if (currentDept === 'tpp') {
+                    if (!$('#kode-dok').val()) $('#kode-dok').val('3');
+                } else {
+                    $('#kode-dok').val('8');
+                }
             } else if (val === '23') {
-                // 23 = Stripping Stuffing Lini 2 -> Khusus Gudang LCL
+                // 23 = Stripping Stuffing Lini 2 -> Khusus Gudang LCL (704) / TPP (3)
                 if (currentDept === 'gudang') {
                     if (!$('#kode-dok').val() || $('#kode-dok').val() === '3') {
                         $('#kode-dok').val('704');
                     }
+                } else if (currentDept === 'tpp') {
+                    $('#kode-dok').val('3');
+                }
+            } else if (val === '19' || val === '20') {
+                // 19 = Truck In Lini 2, 20 = Pickup Lini 2 -> Default Dokumen SPPB BC 2.0 (1) atau BC 2.3 (2)
+                if (!$('#kode-dok').val() || $('#kode-dok').val() === '3' || $('#kode-dok').val() === '704') {
+                    $('#kode-dok').val('1'); // SPPB PIB (BC 2.0)
                 }
             } else if (val === '6') {
                 // Gate Out Lini 2
                 if (currentDept === 'gudang') {
                     $('#jenis-cont').val('4'); // Empty container
                 } else {
-                    if (!$('#kode-dok').val() || $('#kode-dok').val() === '3') {
-                        $('#kode-dok').val('20'); // BC 2.0 (SPPB PIB)
-                    }
-                }
-            } else if (val === '21') {
-                // 21 = Behandle Lini 2 -> Dokumen 8 (PPB - Dok. Periksa Fisik)
-                $('#kode-dok').val('8');
-            } else if (val === '20') {
-                // 20 = Pickup Lini 2 -> Default Dokumen SPPB BC 2.0 (1) atau BC 2.3 (2)
-                if (currentDept === 'gudang') {
                     if (!$('#kode-dok').val() || $('#kode-dok').val() === '3' || $('#kode-dok').val() === '704') {
-                        $('#kode-dok').val('1');
+                        $('#kode-dok').val('1'); // SPPB PIB (BC 2.0)
                     }
                 }
             } else if (val === '7' || val === '8' || val === '18' || val === '24') {
@@ -2081,7 +2091,7 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
             $('#nopol').val(p.nomorPolisi || '');
 
             // 4. Posisi Yard - Hanya diisi untuk kegiatan Stacking / Yard (kegiatan selain Stacking tidak mengirimkan posisi yard)
-            const isStacking = [10, 11, 15, 17, 18, 22, 24].includes(parseInt(p.kodeKegiatan, 10));
+            const isStacking = [10, 11, 14, 15, 17, 18, 21, 22, 24].includes(parseInt(p.kodeKegiatan, 10));
             if (isStacking && p.block) {
                 $('#block-loc').val(p.block);
                 $('#slot-loc').val(p.slot || '');
@@ -2685,6 +2695,12 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
         $(document).ready(function() {
             setDepartment('<?= $activeDept ?>', true);
             initSelect2Container();
+            <?php if (!empty($preloadCont)): ?>
+            const initialCont = '<?= e($preloadCont) ?>';
+            const newOpt = new Option(initialCont, initialCont, true, true);
+            $('#no-cont').append(newOpt).trigger('change');
+            fetchContainerTimeline(initialCont);
+            <?php endif; ?>
             updateJsonPreview();
 
             // Theme management
