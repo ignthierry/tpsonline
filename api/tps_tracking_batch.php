@@ -11,6 +11,7 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../includes/CeisaClient.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/timeline_engine.php';
 
 requireAuth();
 session_write_close();
@@ -290,6 +291,107 @@ if ($action === 'send') {
 // =========================================================================
 // ACTION 2: CARI KONTAINER UNTUK AUTO-FILL (MULTI-DEPARTEMEN TPP & GUDANG)
 // =========================================================================
+// =========================================================================
+// ACTION 2B: AMBIL RIWAYAT SEMUA ALUR OPERASIONAL BANYAK KONTAINER SEKALIGUS
+// =========================================================================
+if ($action === 'get_batch_timelines') {
+    $rawInput = file_get_contents('php://input');
+    $postData = json_decode($rawInput, true) ?: [];
+    
+    $dept = strtolower(trim((string)($postData['dept'] ?? input('dept', 'tpp'))));
+    $conts = $postData['containers'] ?? ($_REQUEST['containers'] ?? []);
+    if (is_string($conts)) {
+        $decoded = json_decode($conts, true);
+        $conts = is_array($decoded) ? $decoded : explode(',', $conts);
+    }
+    if (!is_array($conts)) $conts = [];
+
+    // Bersihkan daftar kontainer
+    $cleanConts = [];
+    foreach ($conts as $c) {
+        $cStr = strtoupper(trim(str_replace([' ', '-'], '', (string)$c)));
+        if (!empty($cStr) && !in_array($cStr, $cleanConts)) {
+            $cleanConts[] = $cStr;
+        }
+    }
+
+    if (empty($cleanConts)) {
+        jsonResp([
+            'success' => false,
+            'message' => 'Tidak ada nomor kontainer yang dipilih'
+        ], 400);
+    }
+
+    $allFlows = [];
+    $groupedByCont = [];
+
+    foreach ($cleanConts as $noCont) {
+        $tData = getContainerTimelineData($noCont, $dept);
+        $contFlows = [];
+
+        if (!empty($tData['success']) && !empty($tData['timeline'])) {
+            foreach ($tData['timeline'] as $st) {
+                if (!empty($st['available']) && !empty($st['payload'])) {
+                    $flowItem = [
+                        'container_no'    => $st['payload']['nomorKontainer'],
+                        'departemen'      => $st['payload']['departemen'] ?? strtoupper($dept),
+                        'step'            => $st['step'] ?? 1,
+                        'kodeKegiatan'    => (int)$st['payload']['kodeKegiatan'],
+                        'kegiatanLabel'   => $st['kegiatanLabel'] ?? getKegiatanLabel((int)$st['payload']['kodeKegiatan']),
+                        'icon'            => $st['icon'] ?? '📦',
+                        'ukuranKontainer' => (string)($st['payload']['ukuranKontainer'] ?? '20'),
+                        'jenisKontainer'  => (string)($st['payload']['jenisKontainer'] ?? '8'),
+                        'waktuKegiatan'   => $st['payload']['waktuKegiatan'] ?? '',
+                        'yard_block'      => $st['payload']['block'] ?? '',
+                        'slot'            => $st['payload']['slot'] ?? '',
+                        'tier'            => $st['payload']['tier'] ?? '',
+                        'lokasiYard'      => $st['lokasiYard'] ?? ($st['payload']['block'] ?? '-'),
+                        'nopol'           => $st['payload']['nomorPolisi'] ?? '',
+                        'nopolLabel'      => $st['nopolLabel'] ?? ($st['payload']['nomorPolisi'] ?? '-'),
+                        'no_bl'           => $st['payload']['nomorBlAwb'] ?? '',
+                        'kodeDokumen'     => $st['payload']['kodeDokumen'] ?? '',
+                        'nomorDokumen'    => $st['payload']['nomorDokumen'] ?? '',
+                        'dokumenLabel'    => $st['dokumenLabel'] ?? ($st['payload']['nomorDokumen'] ?? '-'),
+                        'tanggalDokumen'  => $st['payload']['tanggalDokumen'] ?? '',
+                        'tanggalBlAwb'    => $st['payload']['tanggalBlAwb'] ?? '',
+                        'is_sent'         => !empty($st['is_sent']),
+                        'sent_info'       => $st['sent_info'] ?? null,
+                        'available'       => !empty($st['available']),
+                        'deskripsi'       => $st['deskripsi'] ?? '',
+                        'payload'         => $st['payload']
+                    ];
+                    $contFlows[] = $flowItem;
+                    $allFlows[] = $flowItem;
+                }
+            }
+        }
+
+        $groupedByCont[$noCont] = [
+            'container_info' => $tData['container'] ?? [
+                'nomorKontainer'  => $noCont,
+                'ukuranKontainer' => '40',
+                'statusKontainer' => 'FCL',
+                'lokasiYard'      => '-',
+                'inTrailer'       => '-',
+                'outTrailer'      => '-',
+                'suratPlp'        => '-',
+                'noBl'            => '-'
+            ],
+            'total_flows'    => count($contFlows),
+            'flows'          => $contFlows
+        ];
+    }
+
+    jsonResp([
+        'success'              => true,
+        'departemen'           => strtoupper($dept),
+        'containers_processed' => count($cleanConts),
+        'total_flows'          => count($allFlows),
+        'flows'                => $allFlows,
+        'grouped_by_container' => $groupedByCont
+    ]);
+}
+
 if ($action === 'search_containers') {
     $q = strtoupper(trim(input('q', input('term', ''))));
     $dept = strtolower(trim((string)input('dept', 'tpp')));
@@ -438,6 +540,8 @@ if ($action === 'search_containers') {
         $isSent = !empty($already);
 
         $formatted[] = [
+            'id'              => $cleanCont,
+            'text'            => $cleanCont,
             'container_no'    => $cleanCont,
             'raw_container_no'=> $r['raw_container_no'] ?? $r['container_no'],
             'size_type'       => $r['size_type'] ?: '40',
