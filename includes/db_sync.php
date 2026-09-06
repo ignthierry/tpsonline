@@ -768,7 +768,7 @@ function syncBc11($pdo, $data) {
 // 12. Tracking TPS
 function syncTracking($pdo, $data) {
     $stmtInsert = $pdo->prepare("
-        INSERT INTO ceisa_tracking (no_cont, no_bl_awb, tgl_bl_awb, status_tracking, waktu_status, keterangan, raw_data, created_at)
+        INSERT INTO ceisa_tps_tracking (no_cont, no_bl_awb, tgl_bl_awb, nama_kegiatan, waktu_kegiatan, keterangan, raw_json, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
     ");
 
@@ -776,8 +776,8 @@ function syncTracking($pdo, $data) {
         $noCont = getValue($item, ['noCont', 'NO_CONT', 'nomorKontainer']);
         $noBlAwb = getValue($item, ['noBlAwb', 'NO_BL_AWB', 'nomorBlAwb']);
         $tglBlAwb = parseDateDb(getValue($item, ['tglBlAwb', 'TGL_BL_AWB', 'tanggalBlAwb']));
-        $statusTracking = getValue($item, ['status', 'STATUS', 'statusTracking', 'status_tracking']);
-        $waktuStatus = getValue($item, ['waktuStatus', 'WAKTU_STATUS', 'waktu_status', 'waktu']);
+        $statusTracking = getValue($item, ['status', 'STATUS', 'statusTracking', 'status_tracking', 'namaKegiatan']);
+        $waktuStatus = getValue($item, ['waktuStatus', 'WAKTU_STATUS', 'waktu_status', 'waktu', 'waktuKegiatan']);
         $keterangan = getValue($item, ['keterangan', 'KETERANGAN', 'uraian']);
         $rawData = json_encode($item, JSON_UNESCAPED_UNICODE);
 

@@ -31,7 +31,7 @@ if (!function_exists('getContainerTimelineData')) {
             return $ts ? date('d-m-Y', $ts) : '';
         };
 
-        // 1. Cek status pengiriman ke CEISA dari ceisa_api_logs dan ceisa_tracking
+        // 1. Cek status pengiriman ke CEISA dari ceisa_api_logs, ceisa_tps_tracking, dan ceisa_tps_tracking_batch
         $sentKegiatan = [];
         if (!empty($pdo_tpsonline)) {
             try {
@@ -74,30 +74,45 @@ if (!function_exists('getContainerTimelineData')) {
                     }
                 }
 
-                // 1b. Cek juga dari ceisa_tracking
-                $stmtTrack = $pdo_tpsonline->prepare("
-                    SELECT status_tracking, keterangan, raw_data, created_at 
-                    FROM ceisa_tracking 
-                    WHERE no_cont = :c
-                    ORDER BY id DESC
-                ");
-                $stmtTrack->execute([':c' => $noContClean]);
-                $trackings = $stmtTrack->fetchAll(PDO::FETCH_ASSOC);
-                foreach ($trackings as $tr) {
-                    $raw = json_decode($tr['raw_data'] ?? '', true);
-                    $kdKeg = null;
-                    if (!empty($raw['payload']['kodeKegiatan'])) {
-                        $kdKeg = (int)$raw['payload']['kodeKegiatan'];
-                    } elseif (preg_match('/Kegiatan\s+(\d+)/i', $tr['keterangan'] ?? '', $m)) {
-                        $kdKeg = (int)$m[1];
+                // 1b. Cek dari ceisa_tps_tracking & ceisa_tps_tracking_batch (tabel khusus)
+                try {
+                    $stmtTpsSingle = $pdo_tpsonline->prepare("
+                        SELECT kode_kegiatan, waktu_kegiatan, created_at 
+                        FROM ceisa_tps_tracking 
+                        WHERE no_cont = :c
+                        ORDER BY id DESC
+                    ");
+                    $stmtTpsSingle->execute([':c' => $noContClean]);
+                    foreach ($stmtTpsSingle->fetchAll(PDO::FETCH_ASSOC) as $tr) {
+                        $kdKeg = (int)$tr['kode_kegiatan'];
+                        if ($kdKeg && !isset($sentKegiatan[$kdKeg])) {
+                            $sentKegiatan[$kdKeg] = [
+                                'sent_at'       => date('d-m-Y H:i', strtotime($tr['created_at'])),
+                                'waktuKegiatan' => $tr['waktu_kegiatan'] ?? '',
+                                'status'        => 'SUCCESS'
+                            ];
+                        }
                     }
-                    if ($kdKeg && !isset($sentKegiatan[$kdKeg])) {
-                        $sentKegiatan[$kdKeg] = [
-                            'sent_at'       => date('d-m-Y H:i', strtotime($tr['created_at'])),
-                            'waktuKegiatan' => $raw['payload']['waktuKegiatan'] ?? '',
-                            'status'        => 'SUCCESS'
-                        ];
+
+                    $stmtTpsB = $pdo_tpsonline->prepare("
+                        SELECT kode_kegiatan, waktu_kegiatan, created_at 
+                        FROM ceisa_tps_tracking_batch 
+                        WHERE no_cont = :c
+                        ORDER BY id DESC
+                    ");
+                    $stmtTpsB->execute([':c' => $noContClean]);
+                    foreach ($stmtTpsB->fetchAll(PDO::FETCH_ASSOC) as $tr) {
+                        $kdKeg = (int)$tr['kode_kegiatan'];
+                        if ($kdKeg && !isset($sentKegiatan[$kdKeg])) {
+                            $sentKegiatan[$kdKeg] = [
+                                'sent_at'       => date('d-m-Y H:i', strtotime($tr['created_at'])),
+                                'waktuKegiatan' => $tr['waktu_kegiatan'] ?? '',
+                                'status'        => 'SUCCESS'
+                            ];
+                        }
                     }
+                } catch (Exception $eNewTbl) {
+                    // Abaikan jika query tabel baru gagal
                 }
             } catch (Exception $eLogs) {
                 error_log("Error check CEISA logs: " . $eLogs->getMessage());

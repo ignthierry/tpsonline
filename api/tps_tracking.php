@@ -178,7 +178,7 @@ if ($action === 'send') {
                     json_encode($rawCeisa)
                 ]);
 
-                // 2. Jika Berhasil atau Duplikat (409 sudah pernah ada di CEISA), pastikan tercatat di ceisa_tracking
+                // 2. Simpan ke tabel khusus ceisa_tps_tracking
                 if ($isRecorded) {
                     $waktuDb = null;
                     if (!empty($cleanPayload['waktuKegiatan'])) {
@@ -190,46 +190,70 @@ if ($action === 'send') {
                         $tglBlDb = date('Y-m-d', strtotime($cleanPayload['tanggalBlAwb']));
                     }
 
+                    $tglDokDb = null;
+                    if (!empty($cleanPayload['tanggalDokumen'])) {
+                        $tglDokDb = date('Y-m-d', strtotime($cleanPayload['tanggalDokumen']));
+                    }
+
                     $kegiatanLabel = getKegiatanLabel($cleanPayload['kodeKegiatan']);
-                    $deptLabel = !empty($payload['departemen']) ? '[' . strtoupper(trim($payload['departemen'])) . '] ' : '[TPP] ';
+                    $dept = !empty($payload['departemen']) ? strtoupper(trim($payload['departemen'])) : ((isset($cleanPayload['kodeGudang']) && strtoupper($cleanPayload['kodeGudang']) === 'GPSU') ? 'GUDANG' : 'TPP');
+                    $deptLabel = "[{$dept}] ";
+                    $keteranganSuffix = $isConflict ? ' (Pernah Terkirim/409)' : '';
+                    $ceisaId = $res['data']['id'] ?? ($rawCeisa['id'] ?? null);
 
-                    // Cegah duplikasi record di ceisa_tracking
-                    $stmtCheck = $pdo_tpsonline->prepare("
-                        SELECT id FROM ceisa_tracking 
-                        WHERE no_cont = ? AND status_tracking = ? AND (waktu_status = ? OR waktu_status IS NULL)
-                        LIMIT 1
-                    ");
-                    $stmtCheck->execute([
-                        $cleanPayload['nomorKontainer'],
-                        $kegiatanLabel,
-                        $waktuDb
-                    ]);
+                    $rawJsonBundle = [
+                        'payload'  => $cleanPayload,
+                        'response' => $res['data'] ?? $rawCeisa
+                    ];
 
-                    if (!$stmtCheck->fetchColumn()) {
-                        $stmtTrack = $pdo_tpsonline->prepare("
-                            INSERT INTO ceisa_tracking 
-                            (no_cont, no_bl_awb, tgl_bl_awb, status_tracking, waktu_status, keterangan, raw_data, created_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                    // 2a. Simpan ke Tabel Khusus ceisa_tps_tracking
+                    try {
+                        $stmtTpsTrack = $pdo_tpsonline->prepare("
+                            INSERT INTO ceisa_tps_tracking (
+                                no_cont, ukuran, jenis_kontainer, tipe_kontainer, kd_tps, kd_gudang, departemen,
+                                kode_kegiatan, nama_kegiatan, waktu_kegiatan, no_bl_awb, tgl_bl_awb,
+                                kode_dokumen, no_dokumen, tgl_dokumen, lokasi_block, lokasi_slot, lokasi_tier,
+                                no_polisi, stid, status_kirim, http_code, ceisa_id, keterangan,
+                                raw_payload, raw_response, raw_json, created_at
+                            ) VALUES (
+                                ?, ?, ?, ?, ?, ?, ?,
+                                ?, ?, ?, ?, ?,
+                                ?, ?, ?, ?, ?, ?,
+                                ?, ?, ?, ?, ?, ?,
+                                ?, ?, ?, NOW()
+                            )
                         ");
-
-                        $keteranganSuffix = $isConflict ? ' (Pernah Terkirim/409)' : '';
-                        $batchId = !empty($payload['batch_id']) ? trim((string)$payload['batch_id']) : (!empty($cleanPayload['batch_id']) ? trim((string)$cleanPayload['batch_id']) : null);
-                        $batchTag = $batchId ? '[BATCH] ' : '';
-                        $batchSuffix = $batchId ? " | {$batchId}" : '';
-
-                        $stmtTrack->execute([
+                        $stmtTpsTrack->execute([
                             $cleanPayload['nomorKontainer'],
-                            $cleanPayload['nomorBlAwb'] ?? null,
-                            $tglBlDb,
+                            $cleanPayload['ukuranKontainer'] ?? '40',
+                            $cleanPayload['jenisKontainer'] ?? '8',
+                            null,
+                            $cleanPayload['kodeTps'] ?? 'PSU0',
+                            $cleanPayload['kodeGudang'] ?? 'CPSU',
+                            $dept,
+                            $cleanPayload['kodeKegiatan'],
                             $kegiatanLabel,
                             $waktuDb,
-                            $batchTag . $deptLabel . "Kegiatan {$cleanPayload['kodeKegiatan']}: {$kegiatanLabel}" . (!empty($cleanPayload['nomorPolisi']) ? " (Nopol: {$cleanPayload['nomorPolisi']})" : '') . $batchSuffix . $keteranganSuffix,
-                            json_encode([
-                                'payload'  => $cleanPayload,
-                                'response' => $res['data'] ?? $rawCeisa,
-                                'batch_id' => $batchId
-                            ])
+                            $cleanPayload['nomorBlAwb'] ?? null,
+                            $tglBlDb,
+                            $cleanPayload['kodeDokumen'] ?? null,
+                            $cleanPayload['nomorDokumen'] ?? null,
+                            $tglDokDb,
+                            $cleanPayload['block'] ?? null,
+                            $cleanPayload['slot'] ?? null,
+                            $cleanPayload['tier'] ?? null,
+                            $cleanPayload['nomorPolisi'] ?? null,
+                            $cleanPayload['stid'] ?? null,
+                            $isConflict ? 'CONFLICT' : 'SUCCESS',
+                            $res['code'] ?? ($isConflict ? 409 : 201),
+                            $ceisaId,
+                            $deptLabel . "Kegiatan {$cleanPayload['kodeKegiatan']}: {$kegiatanLabel}" . (!empty($cleanPayload['nomorPolisi']) ? " (Nopol: {$cleanPayload['nomorPolisi']})" : '') . $keteranganSuffix,
+                            json_encode($cleanPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                            json_encode($res['data'] ?? $rawCeisa, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                            json_encode($rawJsonBundle, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
                         ]);
+                    } catch (Exception $eSingle) {
+                        error_log("Error insert ceisa_tps_tracking: " . $eSingle->getMessage());
                     }
                 }
             }
@@ -393,7 +417,7 @@ if ($action === 'search_container') {
         error_log("Error search container (dept: $dept): " . $e->getMessage());
     }
 
-    // Pengecekan status pernah terkirim dari ceisa_tracking hanya untuk kontainer yang ditemukan
+    // Pengecekan status pernah terkirim dari ceisa_tps_tracking hanya untuk kontainer yang ditemukan
     $alreadySentMap = [];
     if (!empty($results) && !empty($pdo_tpsonline)) {
         try {
@@ -401,8 +425,8 @@ if ($action === 'search_container') {
             if (!empty($contList)) {
                 $placeholders = implode(',', array_fill(0, count($contList), '?'));
                 $stmtTrack = $pdo_tpsonline->prepare("
-                    SELECT no_cont, status_tracking, waktu_status 
-                    FROM ceisa_tracking 
+                    SELECT no_cont, nama_kegiatan AS status_tracking, waktu_kegiatan AS waktu_status 
+                    FROM ceisa_tps_tracking 
                     WHERE no_cont IN ($placeholders)
                     ORDER BY id DESC
                 ");
@@ -505,7 +529,7 @@ if ($action === 'history' || $action === 'report') {
             if (preg_match('/^(\d{2})-(\d{2})-(\d{4})$/', $startDate, $m)) {
                 $startDate = "{$m[3]}-{$m[2]}-{$m[1]}";
             }
-            $where[] = "(DATE(waktu_status) >= :start_date OR DATE(created_at) >= :start_date2)";
+            $where[] = "(DATE(waktu_kegiatan) >= :start_date OR DATE(created_at) >= :start_date2)";
             $params[':start_date'] = $startDate;
             $params[':start_date2'] = $startDate;
         }
@@ -514,13 +538,13 @@ if ($action === 'history' || $action === 'report') {
             if (preg_match('/^(\d{2})-(\d{2})-(\d{4})$/', $endDate, $m)) {
                 $endDate = "{$m[3]}-{$m[2]}-{$m[1]}";
             }
-            $where[] = "(DATE(waktu_status) <= :end_date OR DATE(created_at) <= :end_date2)";
+            $where[] = "(DATE(waktu_kegiatan) <= :end_date OR DATE(created_at) <= :end_date2)";
             $params[':end_date'] = $endDate;
             $params[':end_date2'] = $endDate;
         }
 
         if (!empty($kegiatan)) {
-            $where[] = "(status_tracking LIKE :kegiatan OR keterangan LIKE :kegiatan2 OR raw_data LIKE :kegiatan3 OR raw_data LIKE :kegiatan4)";
+            $where[] = "(nama_kegiatan LIKE :kegiatan OR keterangan LIKE :kegiatan2 OR raw_json LIKE :kegiatan3 OR raw_json LIKE :kegiatan4)";
             $params[':kegiatan'] = "%$kegiatan%";
             $params[':kegiatan2'] = "%Kegiatan $kegiatan:%";
             $params[':kegiatan3'] = "%\"kodeKegiatan\":$kegiatan%";
@@ -530,17 +554,18 @@ if ($action === 'history' || $action === 'report') {
         // Filter Departemen Operasional (TPP vs GUDANG)
         $deptParam = strtolower(trim((string)input('dept', input('kodeGudang', ''))));
         if ($deptParam === 'tpp' || $deptParam === 'cpsu') {
-            $where[] = "(raw_data LIKE '%\"kodeGudang\"%\"CPSU\"%' OR keterangan LIKE '%[TPP]%' OR (raw_data NOT LIKE '%\"kodeGudang\"%\"GPSU\"%' AND keterangan NOT LIKE '%[GUDANG]%'))";
+            $where[] = "(departemen = 'TPP' OR kd_gudang = 'CPSU' OR keterangan LIKE '%[TPP]%')";
         } elseif ($deptParam === 'gudang' || $deptParam === 'gpsu') {
-            $where[] = "(raw_data LIKE '%\"kodeGudang\"%\"GPSU\"%' OR keterangan LIKE '%[GUDANG]%')";
+            $where[] = "(departemen = 'GUDANG' OR kd_gudang = 'GPSU' OR keterangan LIKE '%[GUDANG]%')";
         }
 
         if (!empty($q)) {
-            $where[] = "(no_cont LIKE :q OR no_bl_awb LIKE :q2 OR keterangan LIKE :q3 OR raw_data LIKE :q4)";
+            $where[] = "(no_cont LIKE :q OR no_bl_awb LIKE :q2 OR keterangan LIKE :q3 OR raw_payload LIKE :q4 OR raw_json LIKE :q5)";
             $params[':q'] = "%$q%";
             $params[':q2'] = "%$q%";
             $params[':q3'] = "%$q%";
             $params[':q4'] = "%$q%";
+            $params[':q5'] = "%$q%";
         }
 
         $whereSql = !empty($where) ? " WHERE " . implode(" AND ", $where) : "";
@@ -549,14 +574,34 @@ if ($action === 'history' || $action === 'report') {
             SELECT 
                 id,
                 no_cont,
+                ukuran,
+                jenis_kontainer,
+                tipe_kontainer,
+                kd_tps,
+                kd_gudang,
+                departemen,
+                kode_kegiatan,
+                nama_kegiatan AS status_tracking,
+                DATE_FORMAT(waktu_kegiatan, '%d-%m-%Y %H:%i:%s') AS waktu_status,
                 no_bl_awb,
                 DATE_FORMAT(tgl_bl_awb, '%d-%m-%Y') AS tgl_bl_awb,
-                status_tracking,
-                DATE_FORMAT(waktu_status, '%d-%m-%Y %H:%i:%s') AS waktu_status,
+                kode_dokumen,
+                no_dokumen,
+                DATE_FORMAT(tgl_dokumen, '%d-%m-%Y') AS tgl_dokumen,
+                lokasi_block,
+                lokasi_slot,
+                lokasi_tier,
+                no_polisi,
+                stid,
+                status_kirim,
+                http_code,
+                ceisa_id,
                 keterangan,
-                raw_data,
+                raw_payload,
+                raw_response,
+                raw_json AS raw_data,
                 DATE_FORMAT(created_at, '%d-%m-%Y %H:%i:%s') AS created_at
-            FROM ceisa_tracking
+            FROM ceisa_tps_tracking
             {$whereSql}
             ORDER BY id DESC
             LIMIT 500
@@ -669,7 +714,8 @@ if ($action === 'detail') {
 
     try {
         global $pdo_tpsonline;
-        $stmt = $pdo_tpsonline->prepare("SELECT * FROM ceisa_tracking WHERE id = ?");
+        // Ambil dari ceisa_tps_tracking
+        $stmt = $pdo_tpsonline->prepare("SELECT * FROM ceisa_tps_tracking WHERE id = ?");
         $stmt->execute([$id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -677,25 +723,25 @@ if ($action === 'detail') {
             jsonResp(['success' => false, 'message' => 'Data tracking tidak ditemukan'], 404);
         }
 
-        $rawParsed = !empty($row['raw_data']) ? json_decode($row['raw_data'], true) : [];
-        $payload = $rawParsed['payload'] ?? [];
-        $response = $rawParsed['response'] ?? [];
+        $rawParsed = !empty($row['raw_json']) ? json_decode($row['raw_json'], true) : (!empty($row['raw_data']) ? json_decode($row['raw_data'], true) : []);
+        $payload = !empty($row['raw_payload']) ? json_decode($row['raw_payload'], true) : ($rawParsed['payload'] ?? []);
+        $response = !empty($row['raw_response']) ? json_decode($row['raw_response'], true) : ($rawParsed['response'] ?? []);
 
         $noCont = $row['no_cont'];
-        $dept = (stripos($row['keterangan'], '[GUDANG]') !== false || (isset($payload['kodeGudang']) && strtoupper($payload['kodeGudang']) === 'GPSU')) ? 'gudang' : 'tpp';
+        $dept = (stripos($row['keterangan'] ?? '', '[GUDANG]') !== false || (isset($row['departemen']) && strtolower($row['departemen']) === 'gudang') || (isset($payload['kodeGudang']) && strtoupper($payload['kodeGudang']) === 'GPSU')) ? 'gudang' : 'tpp';
 
         // 1. Ambil SELURUH record alur kegiatan yang sudah terkirim / tersimpan di CEISA untuk kontainer ini
         $stmtAll = $pdo_tpsonline->prepare("
             SELECT 
                 id, no_cont, no_bl_awb,
                 DATE_FORMAT(tgl_bl_awb, '%d-%m-%Y') AS tgl_bl_awb,
-                status_tracking,
-                DATE_FORMAT(waktu_status, '%d-%m-%Y %H:%i:%s') AS waktu_status,
-                keterangan, raw_data,
+                nama_kegiatan AS status_tracking,
+                DATE_FORMAT(waktu_kegiatan, '%d-%m-%Y %H:%i:%s') AS waktu_status,
+                keterangan, raw_payload, raw_response, raw_json AS raw_data,
                 DATE_FORMAT(created_at, '%d-%m-%Y %H:%i:%s') AS created_at
-            FROM ceisa_tracking
+            FROM ceisa_tps_tracking
             WHERE no_cont = ?
-            ORDER BY id ASC
+            ORDER BY waktu_kegiatan ASC, id ASC
         ");
         $stmtAll->execute([$noCont]);
         $sentRecords = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
