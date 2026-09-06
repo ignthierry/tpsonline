@@ -606,9 +606,11 @@ if ($action === 'history' || $action === 'report') {
         }
 
         if (!empty($kegiatan)) {
-            $where[] = "(status_tracking LIKE :keg OR keterangan LIKE :keg2)";
+            $where[] = "(status_tracking LIKE :keg OR keterangan LIKE :keg2 OR raw_data LIKE :keg3 OR raw_data LIKE :keg4)";
             $params[':keg'] = "%$kegiatan%";
             $params[':keg2'] = "%Kegiatan $kegiatan:%";
+            $params[':keg3'] = "%\"kodeKegiatan\":$kegiatan%";
+            $params[':keg4'] = "%\"kodeKegiatan\": $kegiatan%";
         }
 
         // Filter Departemen Operasional (TPP vs GUDANG)
@@ -620,10 +622,11 @@ if ($action === 'history' || $action === 'report') {
         }
 
         if (!empty($q)) {
-            $where[] = "(no_cont LIKE :q OR no_bl_awb LIKE :q2 OR keterangan LIKE :q3)";
+            $where[] = "(no_cont LIKE :q OR no_bl_awb LIKE :q2 OR keterangan LIKE :q3 OR raw_data LIKE :q4)";
             $params[':q'] = "%$q%";
             $params[':q2'] = "%$q%";
             $params[':q3'] = "%$q%";
+            $params[':q4'] = "%$q%";
         }
 
         $whereSql = " WHERE " . implode(" AND ", $where);
@@ -646,16 +649,21 @@ if ($action === 'history' || $action === 'report') {
         $stmt->execute($params);
         $rawRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $rows = [];
+        $batchGroups = [];
+        $rawItems = [];
+        $uniqueBatches = [];
+        $allContainers = [];
         $summary = [
-            'total'    => count($rawRows),
-            'tpp'      => 0,
-            'gudang'   => 0,
-            'gate_in'  => 0,
-            'gate_out' => 0,
-            'stacking' => 0,
-            'other'    => 0,
-            'today'    => 0
+            'total'            => 0,
+            'total_containers' => 0,
+            'unique_batches'   => 0,
+            'tpp'              => 0,
+            'gudang'           => 0,
+            'gate_in'          => 0,
+            'gate_out'         => 0,
+            'stacking'         => 0,
+            'other'            => 0,
+            'today'            => 0
         ];
         $todayStr = date('d-m-Y');
 
@@ -663,7 +671,20 @@ if ($action === 'history' || $action === 'report') {
             $rawParsed = !empty($r['raw_data']) ? json_decode($r['raw_data'], true) : [];
             $payload = $rawParsed['payload'] ?? [];
             $response = $rawParsed['response'] ?? [];
-            $batchId = $rawParsed['batch_id'] ?? '-';
+            $batchId = $rawParsed['batch_id'] ?? null;
+            if (!$batchId && preg_match('/(BATCH-\d+-\d+-\d+)/', $r['keterangan'], $bm)) {
+                $batchId = $bm[1];
+            }
+            $isBatch = !empty($batchId) && $batchId !== '-';
+            $groupKey = $isBatch ? $batchId : ('SINGLE-' . $r['id']);
+            $displayBatchId = $isBatch ? $batchId : '-';
+
+            if ($isBatch && !in_array($batchId, $uniqueBatches)) {
+                $uniqueBatches[] = $batchId;
+            }
+            if (!empty($r['no_cont']) && !in_array($r['no_cont'], $allContainers)) {
+                $allContainers[] = $r['no_cont'];
+            }
 
             // Identifikasi Departemen (TPP vs GUDANG)
             $kg = strtoupper(trim((string)($payload['kodeGudang'] ?? '')));
@@ -691,60 +712,217 @@ if ($action === 'history' || $action === 'report') {
             if (!empty($payload['block'])) $loc[] = $payload['block'];
             if (!empty($payload['slot'])) $loc[] = 'S:' . $payload['slot'];
             if (!empty($payload['tier'])) $loc[] = 'T:' . $payload['tier'];
+            $locStr = !empty($loc) ? implode(' ', $loc) : '-';
 
-            $rows[] = [
+            $itemData = [
                 'id'              => $r['id'],
                 'no_cont'         => $r['no_cont'],
                 'no_bl_awb'       => $r['no_bl_awb'] ?: ($payload['nomorBlAwb'] ?? '-'),
                 'tgl_bl_awb'      => $r['tgl_bl_awb'] ?: ($payload['tanggalBlAwb'] ?? '-'),
                 'status_tracking' => $r['status_tracking'],
-                'waktu_status'    => $r['waktu_status'],
+                'kode_kegiatan'   => $payload['kodeKegiatan'] ?? 5,
+                'waktu_status'    => $payload['waktuKegiatan'] ?? $r['waktu_status'],
                 'keterangan'      => $r['keterangan'],
                 'created_at'      => $r['created_at'],
                 'dept'            => $deptName,
                 'kode_gudang'     => $kodeGud,
                 'category'        => $cat,
-                'batch_id'        => $batchId,
+                'batch_id'        => $displayBatchId,
                 'ukuran'          => ($payload['ukuranKontainer'] ?? '40') . ' ft',
                 'jenis'           => ((string)($payload['jenisKontainer'] ?? '8') === '4') ? 'Kosong (Empty)' : (((string)($payload['jenisKontainer'] ?? '8') === '7') ? 'LCL' : 'FCL (Full)'),
-                'kode_kegiatan'   => $payload['kodeKegiatan'] ?? 5,
                 'nopol'           => $payload['nomorPolisi'] ?? '-',
-                'yard_pos'        => !empty($loc) ? implode(' ', $loc) : '-',
+                'yard_pos'        => $locStr,
                 'dokumen_pabean'  => (!empty($payload['nomorDokumen']) ? ($payload['kodeDokumen'] ?? '20') . ' / ' . $payload['nomorDokumen'] : '-'),
                 'raw_payload'     => $payload,
                 'raw_response'    => $response
             ];
+
+            $rawItems[] = $itemData;
+
+            if (!isset($batchGroups[$groupKey])) {
+                $batchGroups[$groupKey] = [
+                    'id'              => $r['id'],
+                    'batch_id'        => $displayBatchId,
+                    'dept'            => $deptName,
+                    'kode_gudang'     => $kodeGud,
+                    'waktu_status'    => $itemData['waktu_status'],
+                    'created_at'      => $r['created_at'],
+                    'containers'      => [],
+                    'bl_list'         => [],
+                    'doc_list'        => [],
+                    'yard_list'       => [],
+                    'nopol_list'      => [],
+                    'activities'      => [],
+                    'items'           => []
+                ];
+            }
+
+            $bg = &$batchGroups[$groupKey];
+            $bg['items'][] = $itemData;
+            if (!empty($r['no_cont']) && !in_array($r['no_cont'], $bg['containers'])) {
+                $bg['containers'][] = $r['no_cont'];
+            }
+            if (!empty($itemData['no_bl_awb']) && $itemData['no_bl_awb'] !== '-' && !in_array($itemData['no_bl_awb'], $bg['bl_list'])) {
+                $bg['bl_list'][] = $itemData['no_bl_awb'];
+            }
+            if (!empty($itemData['dokumen_pabean']) && $itemData['dokumen_pabean'] !== '-' && !in_array($itemData['dokumen_pabean'], $bg['doc_list'])) {
+                $bg['doc_list'][] = $itemData['dokumen_pabean'];
+            }
+            if (!empty($itemData['yard_pos']) && $itemData['yard_pos'] !== '-' && !in_array($itemData['yard_pos'], $bg['yard_list'])) {
+                $bg['yard_list'][] = $itemData['yard_pos'];
+            }
+            if (!empty($itemData['nopol']) && $itemData['nopol'] !== '-' && !in_array($itemData['nopol'], $bg['nopol_list'])) {
+                $bg['nopol_list'][] = $itemData['nopol'];
+            }
+            $actName = $itemData['status_tracking'] ?: ('Kegiatan #' . $itemData['kode_kegiatan']);
+            if (!in_array($actName, $bg['activities'])) {
+                $bg['activities'][] = $actName;
+            }
+            unset($bg);
         }
 
-        jsonResp(['success' => true, 'rows' => $rows, 'summary' => $summary]);
+        foreach ($batchGroups as &$bg) {
+            $bg['total_containers'] = count($bg['containers']);
+            $bg['total_items'] = count($bg['items']);
+            $bg['no_bl_awb'] = !empty($bg['bl_list']) ? implode(', ', $bg['bl_list']) : '-';
+            $bg['dokumen_pabean'] = !empty($bg['doc_list']) ? implode(', ', $bg['doc_list']) : '-';
+            $bg['yard_pos'] = !empty($bg['yard_list']) ? implode(', ', $bg['yard_list']) : '-';
+            $bg['nopol'] = !empty($bg['nopol_list']) ? implode(', ', $bg['nopol_list']) : '-';
+            $bg['status_tracking'] = implode(', ', $bg['activities']);
+        }
+        unset($bg);
+
+        $summary['total'] = count($batchGroups);
+        $summary['unique_batches'] = count($uniqueBatches);
+        $summary['total_containers'] = count($allContainers);
+
+        jsonResp([
+            'success'   => true,
+            'rows'      => array_values($batchGroups),
+            'raw_items' => $rawItems,
+            'summary'   => $summary
+        ]);
     } catch (Exception $e) {
         jsonResp(['success' => false, 'message' => $e->getMessage()], 500);
     }
 }
 
 // =========================================================================
-// ACTION 4: DETAIL SATU DATA TRACKING
+// ACTION 4: DETAIL SATU DATA TRACKING & RINCIAN SELURUH KONTAINER BATCH
 // =========================================================================
 if ($action === 'detail') {
     $id = (int)input('id', 0);
-    if ($id <= 0) {
-        jsonResp(['success' => false, 'message' => 'ID tracking tidak valid'], 400);
+    $batchIdParam = trim((string)input('batch_id', ''));
+    if ($id <= 0 && empty($batchIdParam)) {
+        jsonResp(['success' => false, 'message' => 'ID tracking atau Batch ID tidak valid'], 400);
     }
     try {
         global $pdo_tpsonline;
-        $stmt = $pdo_tpsonline->prepare("SELECT * FROM ceisa_tracking WHERE id = ?");
-        $stmt->execute([$id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($id > 0) {
+            $stmt = $pdo_tpsonline->prepare("SELECT * FROM ceisa_tracking WHERE id = ?");
+            $stmt->execute([$id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        } else {
+            $stmt = $pdo_tpsonline->prepare("SELECT * FROM ceisa_tracking WHERE (keterangan LIKE :b1 OR raw_data LIKE :b2) ORDER BY id DESC LIMIT 1");
+            $stmt->execute([
+                ':b1' => "%{$batchIdParam}%",
+                ':b2' => "%\"batch_id\":\"{$batchIdParam}\"%"
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
         if (!$row) {
             jsonResp(['success' => false, 'message' => 'Data tracking tidak ditemukan'], 404);
         }
         $rawParsed = !empty($row['raw_data']) ? json_decode($row['raw_data'], true) : [];
+        $batchId = (!empty($batchIdParam) && $batchIdParam !== '-') ? $batchIdParam : ($rawParsed['batch_id'] ?? null);
+        if (!$batchId && preg_match('/(BATCH-\d+-\d+-\d+)/', $row['keterangan'], $bm)) {
+            $batchId = $bm[1];
+        }
+
+        // Query seluruh kontainer/alur yang tergabung dalam batch yang sama
+        $batchItems = [];
+        if (!empty($batchId)) {
+            $stmtBatch = $pdo_tpsonline->prepare("
+                SELECT id, no_cont, no_bl_awb, tgl_bl_awb, status_tracking, waktu_status, keterangan, raw_data, created_at
+                FROM ceisa_tracking 
+                WHERE (keterangan LIKE :b1 OR raw_data LIKE :b2)
+                ORDER BY id ASC
+            ");
+            $stmtBatch->execute([
+                ':b1' => "%{$batchId}%",
+                ':b2' => "%\"batch_id\":\"{$batchId}\"%"
+            ]);
+            $batchRows = $stmtBatch->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($batchRows as $br) {
+                $bRaw = !empty($br['raw_data']) ? json_decode($br['raw_data'], true) : [];
+                $bPayload = $bRaw['payload'] ?? [];
+                $bResp = $bRaw['response'] ?? [];
+
+                $loc = [];
+                if (!empty($bPayload['block'])) $loc[] = $bPayload['block'];
+                if (!empty($bPayload['slot'])) $loc[] = 'S:' . $bPayload['slot'];
+                if (!empty($bPayload['tier'])) $loc[] = 'T:' . $bPayload['tier'];
+
+                $batchItems[] = [
+                    'id'             => $br['id'],
+                    'no_cont'        => $br['no_cont'],
+                    'ukuran'         => ($bPayload['ukuranKontainer'] ?? '40') . ' ft',
+                    'jenis'          => ((string)($bPayload['jenisKontainer'] ?? '8') === '4') ? 'EMPTY' : (((string)($bPayload['jenisKontainer'] ?? '8') === '7') ? 'LCL' : 'FCL'),
+                    'status_tracking'=> $br['status_tracking'],
+                    'kode_kegiatan'  => $bPayload['kodeKegiatan'] ?? 5,
+                    'waktu_status'   => $bPayload['waktuKegiatan'] ?? $br['waktu_status'],
+                    'waktu_kegiatan' => $bPayload['waktuKegiatan'] ?? $br['waktu_status'],
+                    'no_bl_awb'      => $br['no_bl_awb'] ?: ($bPayload['nomorBlAwb'] ?? '-'),
+                    'tgl_bl_awb'     => $br['tgl_bl_awb'] ?: ($bPayload['tanggalBlAwb'] ?? '-'),
+                    'dokumen_pabean' => (!empty($bPayload['nomorDokumen']) ? ($bPayload['kodeDokumen'] ?? '20') . ' / ' . $bPayload['nomorDokumen'] : '-'),
+                    'yard_pos'       => !empty($loc) ? implode(' ', $loc) : '-',
+                    'nopol'          => $bPayload['nomorPolisi'] ?? '-',
+                    'ceisa_id'       => $bResp['id'] ?? $br['id'],
+                    'raw_payload'    => $bPayload
+                ];
+            }
+        }
+
+        // Grouping berdasarkan Nomor Kontainer
+        $containersGrouped = [];
+        foreach ($batchItems as $bi) {
+            $cNo = $bi['no_cont'];
+            if (!isset($containersGrouped[$cNo])) {
+                $deptTag = (stripos($row['keterangan'], '[GUDANG]') !== false || (isset($bi['raw_payload']['kodeGudang']) && strtoupper($bi['raw_payload']['kodeGudang']) === 'GPSU')) ? 'GUDANG' : 'TPP';
+                $containersGrouped[$cNo] = [
+                    'no_cont'          => $cNo,
+                    'nomorKontainer'   => $cNo,
+                    'ukuran'           => $bi['ukuran'],
+                    'jenis'            => $bi['jenis'],
+                    'dept'             => $deptTag,
+                    'yard_pos'         => $bi['yard_pos'],
+                    'nopol'            => $bi['nopol'],
+                    'dokumen_pabean'   => $bi['dokumen_pabean'],
+                    'no_bl_awb'        => $bi['no_bl_awb'],
+                    'tgl_bl_awb'       => $bi['tgl_bl_awb'],
+                    'flows'            => []
+                ];
+            }
+            $containersGrouped[$cNo]['flows'][] = $bi;
+        }
+
+        // Hitung total alur di setiap kontainer
+        foreach ($containersGrouped as &$cItem) {
+            $cItem['total_flows'] = count($cItem['flows']);
+        }
+        unset($cItem);
+
         jsonResp([
-            'success'  => true,
-            'data'     => $row,
-            'payload'  => $rawParsed['payload'] ?? [],
-            'response' => $rawParsed['response'] ?? [],
-            'batch_id' => $rawParsed['batch_id'] ?? '-'
+            'success'            => true,
+            'data'               => $row,
+            'payload'            => $rawParsed['payload'] ?? [],
+            'response'           => $rawParsed['response'] ?? [],
+            'batch_id'           => $batchId ?: '-',
+            'total_batch'        => count($batchItems),
+            'total_containers'   => count($containersGrouped),
+            'grouped_containers' => array_values($containersGrouped),
+            'batch_items'        => $batchItems
         ]);
     } catch (Exception $e) {
         jsonResp(['success' => false, 'message' => $e->getMessage()], 500);

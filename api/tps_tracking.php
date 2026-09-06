@@ -213,16 +213,21 @@ if ($action === 'send') {
                         ");
 
                         $keteranganSuffix = $isConflict ? ' (Pernah Terkirim/409)' : '';
+                        $batchId = !empty($payload['batch_id']) ? trim((string)$payload['batch_id']) : (!empty($cleanPayload['batch_id']) ? trim((string)$cleanPayload['batch_id']) : null);
+                        $batchTag = $batchId ? '[BATCH] ' : '';
+                        $batchSuffix = $batchId ? " | {$batchId}" : '';
+
                         $stmtTrack->execute([
                             $cleanPayload['nomorKontainer'],
                             $cleanPayload['nomorBlAwb'] ?? null,
                             $tglBlDb,
                             $kegiatanLabel,
                             $waktuDb,
-                            $deptLabel . "Kegiatan {$cleanPayload['kodeKegiatan']}: {$kegiatanLabel}" . (!empty($cleanPayload['nomorPolisi']) ? " (Nopol: {$cleanPayload['nomorPolisi']})" : '') . $keteranganSuffix,
+                            $batchTag . $deptLabel . "Kegiatan {$cleanPayload['kodeKegiatan']}: {$kegiatanLabel}" . (!empty($cleanPayload['nomorPolisi']) ? " (Nopol: {$cleanPayload['nomorPolisi']})" : '') . $batchSuffix . $keteranganSuffix,
                             json_encode([
                                 'payload'  => $cleanPayload,
-                                'response' => $res['data'] ?? $rawCeisa
+                                'response' => $res['data'] ?? $rawCeisa,
+                                'batch_id' => $batchId
                             ])
                         ]);
                     }
@@ -515,10 +520,11 @@ if ($action === 'history' || $action === 'report') {
         }
 
         if (!empty($kegiatan)) {
-            $where[] = "(status_tracking LIKE :kegiatan OR keterangan LIKE :kegiatan2 OR raw_data LIKE :kegiatan3)";
+            $where[] = "(status_tracking LIKE :kegiatan OR keterangan LIKE :kegiatan2 OR raw_data LIKE :kegiatan3 OR raw_data LIKE :kegiatan4)";
             $params[':kegiatan'] = "%$kegiatan%";
             $params[':kegiatan2'] = "%Kegiatan $kegiatan:%";
-            $params[':kegiatan3'] = "%\"kodeKegiatan\":$kegiatan,%";
+            $params[':kegiatan3'] = "%\"kodeKegiatan\":$kegiatan%";
+            $params[':kegiatan4'] = "%\"kodeKegiatan\": $kegiatan%";
         }
 
         // Filter Departemen Operasional (TPP vs GUDANG)
@@ -653,7 +659,7 @@ if ($action === 'history' || $action === 'report') {
 }
 
 // =========================================================================
-// ACTION 4: DETAIL SATU DATA TRACKING UNTUK MODAL
+// ACTION 4: DETAIL SATU DATA TRACKING & SELURUH ALUR PROSES KEGIATAN KONTAINER
 // =========================================================================
 if ($action === 'detail') {
     $id = (int)input('id', 0);
@@ -675,11 +681,77 @@ if ($action === 'detail') {
         $payload = $rawParsed['payload'] ?? [];
         $response = $rawParsed['response'] ?? [];
 
+        $noCont = $row['no_cont'];
+        $dept = (stripos($row['keterangan'], '[GUDANG]') !== false || (isset($payload['kodeGudang']) && strtoupper($payload['kodeGudang']) === 'GPSU')) ? 'gudang' : 'tpp';
+
+        // 1. Ambil SELURUH record alur kegiatan yang sudah terkirim / tersimpan di CEISA untuk kontainer ini
+        $stmtAll = $pdo_tpsonline->prepare("
+            SELECT 
+                id, no_cont, no_bl_awb,
+                DATE_FORMAT(tgl_bl_awb, '%d-%m-%Y') AS tgl_bl_awb,
+                status_tracking,
+                DATE_FORMAT(waktu_status, '%d-%m-%Y %H:%i:%s') AS waktu_status,
+                keterangan, raw_data,
+                DATE_FORMAT(created_at, '%d-%m-%Y %H:%i:%s') AS created_at
+            FROM ceisa_tracking
+            WHERE no_cont = ?
+            ORDER BY id ASC
+        ");
+        $stmtAll->execute([$noCont]);
+        $sentRecords = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
+
+        $sentFlows = [];
+        foreach ($sentRecords as $sr) {
+            $sRaw = !empty($sr['raw_data']) ? json_decode($sr['raw_data'], true) : [];
+            $sPayload = $sRaw['payload'] ?? [];
+            $sResp = $sRaw['response'] ?? [];
+
+            $loc = [];
+            if (!empty($sPayload['block'])) $loc[] = $sPayload['block'];
+            if (!empty($sPayload['slot'])) $loc[] = 'S:' . $sPayload['slot'];
+            if (!empty($sPayload['tier'])) $loc[] = 'T:' . $sPayload['tier'];
+
+            $kdKeg = $sPayload['kodeKegiatan'] ?? null;
+            if (!$kdKeg && preg_match('/Kegiatan\s+(\d+)/i', $sr['keterangan'], $km)) {
+                $kdKeg = (int)$km[1];
+            }
+            if (!$kdKeg) $kdKeg = 5;
+
+            $sentFlows[] = [
+                'id'              => $sr['id'],
+                'no_cont'         => $sr['no_cont'],
+                'kode_kegiatan'   => $kdKeg,
+                'status_tracking' => $sr['status_tracking'],
+                'kegiatan_label'  => getKegiatanLabel((int)$kdKeg),
+                'waktu_status'    => $sr['waktu_status'],
+                'waktu_kegiatan'  => $sPayload['waktuKegiatan'] ?? $sr['waktu_status'],
+                'no_bl_awb'       => $sr['no_bl_awb'] ?: ($sPayload['nomorBlAwb'] ?? '-'),
+                'tgl_bl_awb'      => $sr['tgl_bl_awb'] ?: ($sPayload['tanggalBlAwb'] ?? '-'),
+                'dokumen_pabean'  => (!empty($sPayload['nomorDokumen']) ? ($sPayload['kodeDokumen'] ?? '20') . ' / ' . $sPayload['nomorDokumen'] : '-'),
+                'yard_pos'        => !empty($loc) ? implode(' ', $loc) : '-',
+                'nopol'           => $sPayload['nomorPolisi'] ?? '-',
+                'ceisa_id'        => $sResp['id'] ?? $sr['id'],
+                'waktu_rekam'     => $sResp['waktuRekam'] ?? $sr['created_at'],
+                'keterangan'      => $sr['keterangan'],
+                'raw_payload'     => $sPayload,
+                'raw_response'    => $sResp
+            ];
+        }
+
+        // 2. Ambil seluruh timeline tahapan operasional kontainer dari timeline_engine
+        $timelineData = getContainerTimelineData($noCont, $dept);
+
         jsonResp([
-            'success'     => true,
-            'data'        => $row,
-            'payload'     => $payload,
-            'response'    => $response
+            'success'        => true,
+            'data'           => $row,
+            'container_no'   => $noCont,
+            'dept'           => $dept,
+            'total_sent'     => count($sentFlows),
+            'sent_flows'     => $sentFlows,
+            'timeline'       => $timelineData['timeline'] ?? [],
+            'container_info' => $timelineData['container'] ?? [],
+            'payload'        => $payload,
+            'response'       => $response
         ]);
     } catch (Exception $e) {
         jsonResp(['success' => false, 'message' => $e->getMessage()], 500);

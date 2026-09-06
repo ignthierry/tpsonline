@@ -815,15 +815,15 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                             <span style="display:flex; align-items:center; gap:6px;">
                                 <span>🏢</span> DEPARTEMEN OPERASIONAL LINI 2
                             </span>
-                            <span id="dept-database-badge" style="font-size:0.75rem; text-transform:none; padding:3px 10px; border-radius:6px; background:rgba(59,130,246,0.15); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3); font-weight:600;">
-                                DB: tpp_primamas (PLP FCL)
+                            <span id="dept-database-badge" style="font-size:0.75rem; text-transform:none; padding:3px 10px; border-radius:6px; <?= $activeDept === 'gudang' ? 'background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);' : 'background:rgba(59,130,246,0.15); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);' ?> font-weight:600;">
+                                <?= $activeDept === 'gudang' ? 'DB: primamas (Gudang LCL)' : 'DB: tpp_primamas (PLP FCL)' ?>
                             </span>
                         </div>
                         <div class="dept-toggle-group">
-                            <button type="button" class="dept-btn active dept-tpp" id="btn-dept-tpp" onclick="setDepartment('tpp')">
+                            <button type="button" class="dept-btn <?= $activeDept === 'tpp' ? 'active dept-tpp' : '' ?>" id="btn-dept-tpp" onclick="setDepartment('tpp')">
                                 <span style="font-size:1.1rem;">🏢</span> TPP (PLP / Lapangan Penumpukan FCL)
                             </button>
-                            <button type="button" class="dept-btn" id="btn-dept-gudang" onclick="setDepartment('gudang')">
+                            <button type="button" class="dept-btn <?= $activeDept === 'gudang' ? 'active dept-gudang' : '' ?>" id="btn-dept-gudang" onclick="setDepartment('gudang')">
                                 <span style="font-size:1.1rem;">🏬</span> Gudang (LCL / CFS Stripping)
                             </button>
                         </div>
@@ -837,7 +837,7 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                             </div>
                             <div class="picker-actions">
                                 <button type="button" class="btn-action-sm" onclick="openPlpModal()" style="background:rgba(139,92,246,0.15); color:#a78bfa; border-color:rgba(139,92,246,0.35);">
-                                    <span id="btn-modal-icon">📥</span> <span id="btn-modal-label">Pilih dari Database PLP</span>
+                                    <span id="btn-modal-icon">📥</span> <span id="btn-modal-label"><?= $activeDept === 'gudang' ? 'Pilih dari Gudang LCL' : 'Pilih dari Database PLP' ?></span>
                                 </button>
                                 <button type="button" class="btn-action-sm" onclick="openPasteModal()" style="background:rgba(59,130,246,0.15); color:#60a5fa; border-color:rgba(59,130,246,0.35);">
                                     <span>📋</span> Tempel Daftar Kontainer
@@ -1041,7 +1041,7 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
                 <div style="display:flex; align-items:center; gap:10px;">
                     <span style="font-size:1.35rem;" id="modal-plp-icon">📦</span>
                     <h3 id="modal-plp-title" style="margin:0; font-size:1.15rem; color:var(--text-primary); font-weight:700;">
-                        Pilih Data Kontainer dari Database PLP (tppcontplp)
+                        <?= $activeDept === 'gudang' ? 'Pilih Data Kontainer dari Database Gudang (primamas - LCL)' : 'Pilih Data Kontainer dari Database PLP (tppcontplp)' ?>
                     </h3>
                 </div>
                 <button type="button" onclick="closePlpModal()" style="background:none; border:none; color:var(--text-secondary); font-size:1.8rem; cursor:pointer; padding:2px 8px; line-height:1; border-radius:6px;" title="Tutup">&times;</button>
@@ -2036,8 +2036,12 @@ if (!in_array($activeDept, ['tpp', 'gudang'])) {
             let conflictCount = 0;
             let failCount = 0;
 
+            const nowStr = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+            const batchId = `BATCH-${nowStr}-${items.length}`;
+
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
+                item.batch_id = batchId;
                 const percent = Math.round(((i) / items.length) * 100);
 
                 $('#seq-prog-title').html(`Mengirim alur <b>${i + 1}</b> dari <b>${items.length}</b>: <b>${item.nomorKontainer}</b> (Kegiatan #${item.kodeKegiatan})...`);
