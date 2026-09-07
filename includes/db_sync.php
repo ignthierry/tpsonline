@@ -291,6 +291,10 @@ function syncSppb($pdo, $data) {
 
     foreach ($data as $item) {
         $header = $item['header'] ?? $item;
+        // Unwrap jika header dibungkus dalam indexed array [ 0 => [ ... ] ]
+        if (is_array($header) && isset($header[0]) && is_array($header[0])) {
+            $header = $header[0];
+        }
         $detil = $item['detil'] ?? [];
 
         $noSppb = getValue($header, ['noSppb', 'NO_SPPB', 'nomorSppb', 'nomorDokumen', 'noDokumen']);
@@ -304,7 +308,7 @@ function syncSppb($pdo, $data) {
         $stmtCheck->execute([$noSppb, $tglSppb, $car, $noPib]);
         if ($stmtCheck->fetchColumn()) continue;
 
-        $idHeader = getValue($header, ['idHeader', 'ID_HEADER']);
+        $idHeader = getValue($header, ['idHeader', 'ID_HEADER', 'idheader', 'id_header']);
         $kdKantor = getValue($header, ['kdKantor', 'KD_KANTOR', 'kodeKantor', 'kodeKantorPengawas', 'kodeKpbc']);
         $kdKantorPengawas = getValue($header, ['kodeKantorPengawas', 'kdKantorPengawas']);
         $kdKpbc = getValue($header, ['kodeKpbc', 'kdKpbc']);

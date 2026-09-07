@@ -124,17 +124,11 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
             </div>
             <div class="nav-subitems">
                 <?php foreach ($category['endpoints'] as $epKey => $ep): ?>
-                <?php if ($isDashboard): ?>
-                <div class="nav-subitem" data-endpoint="<?= e($epKey) ?>">
-                    <?= e($ep['label']) ?>
-                </div>
-                <?php else: ?>
                 <a href="dashboard.php#<?= e($catKey) ?>/<?= e($epKey) ?>" class="nav-subitem-link" style="text-decoration:none; color:inherit;">
-                    <div class="nav-subitem">
+                    <div class="nav-subitem" data-endpoint="<?= e($epKey) ?>" data-category="<?= e($catKey) ?>">
                         <?= e($ep['label']) ?>
                     </div>
                 </a>
-                <?php endif; ?>
                 <?php endforeach; ?>
             </div>
         </div>

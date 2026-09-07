@@ -93,7 +93,12 @@
 
         setupNavigation();
         setupMobileMenu();
-        showHomePage();
+
+        // Listen for hash changes (browser back/forward or link clicks)
+        window.addEventListener('hashchange', handleRoute);
+
+        // Initial route based on current URL hash
+        handleRoute();
     }
 
     // ===== Navigation =====
@@ -112,20 +117,71 @@
             item.addEventListener('click', (e) => {
                 e.preventDefault();
                 const endpoint = item.dataset.endpoint;
-                const category = item.closest('.nav-section').querySelector('.nav-item').dataset.category;
-                selectEndpoint(category, endpoint);
+                const category = item.dataset.category || item.closest('.nav-section')?.querySelector('.nav-item')?.dataset.category;
+                const targetHash = `#${category}/${endpoint}`;
+                if (window.location.hash !== targetHash) {
+                    window.location.hash = targetHash;
+                } else {
+                    selectEndpoint(category, endpoint);
+                }
             });
         });
 
-        // Home link
-        const homeLink = document.querySelector('.nav-item[data-page="home"]');
-        if (homeLink) {
+        // Dashboard Status / Home link
+        document.querySelectorAll('a[href="dashboard.php"]').forEach((homeLink) => {
             homeLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                clearActiveNav();
-                homeLink.classList.add('active');
-                showHomePage();
+                if (window.location.hash) {
+                    e.preventDefault();
+                    window.location.hash = '';
+                    handleRoute();
+                }
             });
+        });
+    }
+
+    // ===== Route Handling =====
+    function handleRoute() {
+        let hash = (window.location.hash || '').replace(/^#/, '').trim();
+
+        if (!hash || hash === 'home' || hash === 'dashboard') {
+            clearActiveNav();
+            const homeLink = document.querySelector('a[href="dashboard.php"]');
+            if (homeLink) homeLink.classList.add('active');
+            showHomePage();
+            return;
+        }
+
+        let category = null;
+        let endpoint = null;
+
+        if (hash.includes('/')) {
+            const parts = hash.split('/');
+            category = parts[0];
+            endpoint = parts[1];
+        } else {
+            // Hash might be just endpoint name, e.g. #get-impor-sppb
+            endpoint = hash;
+            for (const [catKey, cat] of Object.entries(ENDPOINTS)) {
+                if (cat.endpoints && cat.endpoints[endpoint]) {
+                    category = catKey;
+                    break;
+                }
+            }
+        }
+
+        if (category && endpoint && ENDPOINTS[category] && ENDPOINTS[category].endpoints && ENDPOINTS[category].endpoints[endpoint]) {
+            // Open parent category in sidebar if closed
+            const catItem = document.querySelector(`.nav-item[data-category="${category}"]`);
+            if (catItem) {
+                closeOtherSidebarSections(catItem);
+                catItem.classList.add('expanded');
+                const subitems = catItem.nextElementSibling;
+                if (subitems) subitems.classList.add('open');
+            }
+
+            selectEndpoint(category, endpoint);
+        } else {
+            showHomePage();
         }
     }
 
@@ -150,6 +206,12 @@
         state.tableData = [];
         state.currentPage = 1;
         state.searchTerm = '';
+
+        // Sync URL hash
+        const targetHash = `#${category}/${endpoint}`;
+        if (window.location.hash !== targetHash) {
+            history.replaceState(null, '', targetHash);
+        }
 
         // Update nav active state
         clearActiveNav();
@@ -645,9 +707,12 @@
         const result = {};
         for (const [key, value] of Object.entries(obj)) {
             // Jika ada key 'header' di level root, ratakan propertinya langsung agar kolom tabel bersih
-            if (key === 'header' && !prefix && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                Object.assign(result, flattenObject(value, ''));
-                continue;
+            if (key === 'header' && !prefix && typeof value === 'object' && value !== null) {
+                const headerObj = Array.isArray(value) ? (value[0] || {}) : value;
+                if (typeof headerObj === 'object' && headerObj !== null) {
+                    Object.assign(result, flattenObject(headerObj, ''));
+                    continue;
+                }
             }
 
             const newKey = prefix ? `${prefix}.${key}` : key;
@@ -959,6 +1024,8 @@
         getPreferredTheme,
         openSidebarMenu,
         openSidebarCategory,
+        handleRoute,
+        selectEndpoint,
     };
     window.openSidebarMenu = openSidebarMenu;
     window.openSidebarCategory = openSidebarCategory;
