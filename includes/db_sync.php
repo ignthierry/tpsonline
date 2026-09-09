@@ -84,8 +84,8 @@ function extractDataRows(array $result): array
     }
 
     if (is_array($data)) {
-        // Cek jika dibungkus oleh key entity seperti 'sppb', 'dokumenPabean', 'data', 'list', 'rows', 'responPlp', 'responBatalPlp', 'spjm', dll.
-        foreach (['sppb', 'dokumenPabean', 'data', 'list', 'rows', 'responPlp', 'responBatalPlp', 'spjm', 'npe', 'peb', 'pkbe', 'sp3b', 'manifes', 'tracking'] as $key) {
+        // Cek jika dibungkus oleh key entity seperti 'sppb', 'dokumenPabean', 'data', 'list', 'rows', 'responPlp', 'responBatalPlp', 'responBatal', 'spjm', dll.
+        foreach (['sppb', 'dokumenPabean', 'data', 'list', 'rows', 'responPlp', 'responBatalPlp', 'responBatal', 'spjm', 'npe', 'peb', 'pkbe', 'sp3b', 'manifes', 'tracking'] as $key) {
             if (isset($data[$key]) && is_array($data[$key])) {
                 return isSequentialArray($data[$key]) ? $data[$key] : [$data[$key]];
             }
@@ -494,36 +494,116 @@ function syncDokumenPabean($pdo, $data) {
     }
 }
 
-// 2. PLP Respon
+// 2. PLP Respon (Header, Kontainer & Kemasan)
 function syncResponPlp($pdo, $data) {
-    $stmtCheck = $pdo->prepare("SELECT id FROM ceisa_respon_plp WHERE no_plp = ? AND (tgl_plp = ? OR tgl_plp IS NULL)");
-    $stmtInsert = $pdo->prepare("
+    $stmtCheckLog = $pdo->prepare("SELECT id FROM ceisa_respon_plp WHERE no_plp = ? AND (tgl_plp = ? OR tgl_plp IS NULL)");
+    $stmtInsertLog = $pdo->prepare("
         INSERT INTO ceisa_respon_plp (kd_kantor, kd_tps, ref_number, no_plp, tgl_plp, alasan_reject, no_bc11, tgl_bc11, raw_data, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ");
+
+    $stmtCheckHdr = $pdo->prepare("SELECT id FROM ceisa_plp_header WHERE nomorPlp = ? AND (tanggalPlp = ? OR tanggalPlp IS NULL)");
+    $stmtInsertHdr = $pdo->prepare("
+        INSERT INTO ceisa_plp_header (
+            idTpsPlp, nomorPlp, tanggalPlp, alasanReject, nomorSurat, tanggalSurat,
+            nomorBc11, tanggalBc11, kodeKantor, kodeTpsAsal, kodeTpsTujuan,
+            kodeGudangAsal, kodeGudangTujuan, namaAngkut, nomorVoyFlight,
+            callSign, tanggalTiba, refNumberPlp, raw_data, created_at
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?,
+            ?, ?, ?, ?, NOW()
+        )
+    ");
+
+    $stmtInsertCont = $pdo->prepare("
+        INSERT INTO ceisa_plp_kontainer (idTpsPlp, nomorKontainer, ukuranKontainer, jenisMuat, flagSetuju)
+        VALUES (?, ?, ?, ?, ?)
+    ");
+
+    $stmtInsertKem = $pdo->prepare("
+        INSERT INTO ceisa_plp_kemasan (idTpsPlp, jenisKemasan, jumlahKemasan, nomorBlAwb, tanggalBlAwb, flagSetuju)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
     
     foreach ($data as $item) {
-        $noPlp = getValue($item, ['noPlp', 'NO_PLP', 'nomorPlp', 'NOMOR_PLP', 'no_plp']);
-        $tglPlp = parseDateDb(getValue($item, ['tglPlp', 'TGL_PLP', 'tanggalPlp', 'TANGGAL_PLP', 'tgl_plp']));
+        $header = $item['header'] ?? $item;
+        if (is_array($header) && isset($header[0]) && is_array($header[0])) {
+            $header = $header[0];
+        }
+
+        $noPlp = getValue($header, ['noPlp', 'NO_PLP', 'nomorPlp', 'NOMOR_PLP', 'no_plp']);
+        $tglPlp = parseDateDb(getValue($header, ['tglPlp', 'TGL_PLP', 'tanggalPlp', 'TANGGAL_PLP', 'tgl_plp']));
         
         if (!$noPlp) continue;
         
-        $stmtCheck->execute([$noPlp, $tglPlp]);
-        if ($stmtCheck->fetchColumn()) continue;
-        
-        $kdKantor = getValue($item, ['kdKantor', 'KD_KANTOR', 'kodeKantor', 'kd_kantor']);
-        $kdTps = getValue($item, ['kdTps', 'KD_TPS', 'kodeTps', 'kd_tps']);
-        $refNumber = getValue($item, ['refNumber', 'REF_NUMBER', 'nomorReference', 'ref_number']);
-        $alasanReject = getValue($item, ['alasanReject', 'ALASAN_REJECT', 'alasan_reject', 'keterangan']);
-        $noBc11 = getValue($item, ['noBc11', 'NO_BC11', 'nomorBc11', 'no_bc11']);
-        $tglBc11 = parseDateDb(getValue($item, ['tglBc11', 'TGL_BC11', 'tanggalBc11', 'tgl_bc11']));
+        $idTpsPlp = getValue($header, ['idTpsPlp', 'idTdTpsPlp', 'id_plp']) ?? $noPlp;
+        $kdKantor = getValue($header, ['kdKantor', 'KD_KANTOR', 'kodeKantor', 'kd_kantor']);
+        $kdTps = getValue($header, ['kdTps', 'KD_TPS', 'kodeTps', 'kodeTpsTujuan', 'kd_tps']);
+        $kdTpsAsal = getValue($header, ['kodeTpsAsal', 'kdTpsAsal']);
+        $kdTpsTujuan = getValue($header, ['kodeTpsTujuan', 'kdTpsTujuan']) ?? $kdTps;
+        $gudangAsal = getValue($header, ['gudangAsal', 'kodeGudangAsal']);
+        $gudangTujuan = getValue($header, ['gudangTujuan', 'kodeGudangTujuan']);
+        $refNumber = getValue($header, ['refNumber', 'REF_NUMBER', 'nomorReference', 'ref_number', 'refNumberPlp']);
+        $alasanReject = getValue($header, ['alasanReject', 'ALASAN_REJECT', 'alasan_reject', 'keterangan']);
+        $noBc11 = getValue($header, ['noBc11', 'NO_BC11', 'nomorBc11', 'no_bc11']);
+        $tglBc11 = parseDateDb(getValue($header, ['tglBc11', 'TGL_BC11', 'tanggalBc11', 'tgl_bc11']));
+        $noSurat = getValue($header, ['nomorSurat', 'noSurat']);
+        $tglSurat = parseDateDb(getValue($header, ['tanggalSurat', 'tglSurat']));
+        $namaAngkut = getValue($header, ['namaAngkut', 'NAMA_ANGKUT']);
+        $noVoy = getValue($header, ['nomorVoyFlight', 'noVoyFlight', 'voyage']);
+        $callSign = getValue($header, ['callSign', 'CALL_SIGN']);
+        $tglTiba = parseDateDb(getValue($header, ['tanggalTiba', 'tglTiba']));
+
         $rawData = json_encode($item, JSON_UNESCAPED_UNICODE);
-        
-        $stmtInsert->execute([$kdKantor, $kdTps, $refNumber, $noPlp, $tglPlp, $alasanReject, $noBc11, $tglBc11, $rawData]);
+
+        // 1. Simpan ke ceisa_respon_plp (audit)
+        $stmtCheckLog->execute([$noPlp, $tglPlp]);
+        if (!$stmtCheckLog->fetchColumn()) {
+            $stmtInsertLog->execute([$kdKantor, $kdTps, $refNumber, $noPlp, $tglPlp, $alasanReject, $noBc11, $tglBc11, $rawData]);
+        }
+
+        // 2. Simpan ke ceisa_plp_header jika belum ada
+        $stmtCheckHdr->execute([$noPlp, $tglPlp]);
+        if (!$stmtCheckHdr->fetchColumn()) {
+            $stmtInsertHdr->execute([
+                $idTpsPlp, $noPlp, $tglPlp, $alasanReject, $noSurat, $tglSurat,
+                $noBc11, $tglBc11, $kdKantor, $kdTpsAsal, $kdTpsTujuan,
+                $gudangAsal, $gudangTujuan, $namaAngkut, $noVoy,
+                $callSign, $tglTiba, $refNumber, $rawData
+            ]);
+
+            // 3. Simpan detil kontainer
+            $kontainerList = $item['kontainer'] ?? $item['detil']['kontainer'] ?? [];
+            if (is_array($kontainerList)) {
+                foreach ($kontainerList as $cont) {
+                    $noCont = getValue($cont, ['nomorKontainer', 'noCont', 'no_cont']);
+                    if (!$noCont) continue;
+                    $ukCont = getValue($cont, ['ukuranKontainer', 'ukCont', 'ukuran']);
+                    $jnsMuat = getValue($cont, ['jenisKontainer', 'jenisMuat', 'jnsMuat']);
+                    $flagSetuju = getValue($cont, ['flagSetuju', 'flag_setuju', 'status']);
+                    $stmtInsertCont->execute([$idTpsPlp, $noCont, $ukCont, $jnsMuat, $flagSetuju]);
+                }
+            }
+
+            // 4. Simpan detil kemasan
+            $kemasanList = $item['kemasan'] ?? $item['detil']['kemasan'] ?? [];
+            if (is_array($kemasanList)) {
+                foreach ($kemasanList as $kem) {
+                    $jnsKem = getValue($kem, ['jenisKemasan', 'jnsKemasan']);
+                    $jmlKem = getValue($kem, ['jumlahKemasan', 'jmlKemasan']);
+                    $noBl = getValue($kem, ['nomorBlAwb', 'noBlAwb']);
+                    $tglBl = parseDateDb(getValue($kem, ['tanggalBlAwb', 'tglBlAwb']));
+                    $flagSetuju = getValue($kem, ['flagSetuju', 'flag_setuju', 'status']);
+                    $stmtInsertKem->execute([$idTpsPlp, $jnsKem, $jmlKem, $noBl, $tglBl, $flagSetuju]);
+                }
+            }
+        }
     }
 }
 
-// 3. Batal PLP
+// 3. Batal PLP (Header, Kontainer & Kemasan)
 function syncBatalPlp($pdo, $data) {
     $stmtCheck = $pdo->prepare("SELECT id FROM ceisa_batal_plp WHERE no_batal_plp = ? AND (tgl_batal_plp = ? OR tgl_batal_plp IS NULL)");
     $stmtInsert = $pdo->prepare("
@@ -532,20 +612,25 @@ function syncBatalPlp($pdo, $data) {
     ");
     
     foreach ($data as $item) {
-        $noBatalPlp = getValue($item, ['noBatalPlp', 'NO_BATAL_PLP', 'nomorBatalPlp', 'no_batal_plp']);
-        $tglBatalPlp = parseDateDb(getValue($item, ['tglBatalPlp', 'TGL_BATAL_PLP', 'tanggalBatalPlp', 'tgl_batal_plp']));
+        $header = $item['header'] ?? $item;
+        if (is_array($header) && isset($header[0]) && is_array($header[0])) {
+            $header = $header[0];
+        }
+
+        $noBatalPlp = getValue($header, ['noBatalPlp', 'NO_BATAL_PLP', 'nomorBatalPlp', 'no_batal_plp']);
+        $tglBatalPlp = parseDateDb(getValue($header, ['tglBatalPlp', 'TGL_BATAL_PLP', 'tanggalBatalPlp', 'tgl_batal_plp']));
         
         if (!$noBatalPlp) continue;
         
         $stmtCheck->execute([$noBatalPlp, $tglBatalPlp]);
         if ($stmtCheck->fetchColumn()) continue;
         
-        $kdKantor = getValue($item, ['kdKantor', 'KD_KANTOR', 'kodeKantor', 'kd_kantor']);
-        $kdTps = getValue($item, ['kdTps', 'KD_TPS', 'kodeTps', 'kd_tps']);
-        $refNumber = getValue($item, ['refNumber', 'REF_NUMBER', 'ref_number']);
-        $noPlp = getValue($item, ['noPlp', 'NO_PLP', 'nomorPlp', 'no_plp']);
-        $tglPlp = parseDateDb(getValue($item, ['tglPlp', 'TGL_PLP', 'tanggalPlp', 'tgl_plp']));
-        $alasanReject = getValue($item, ['alasanReject', 'ALASAN_REJECT', 'alasan_reject']);
+        $kdKantor = getValue($header, ['kdKantor', 'KD_KANTOR', 'kodeKantor', 'kd_kantor']);
+        $kdTps = getValue($header, ['kdTps', 'KD_TPS', 'kodeTps', 'kodeTpsTujuan', 'kodeTpsAsal', 'kd_tps']);
+        $refNumber = getValue($header, ['refNumber', 'REF_NUMBER', 'referensiNomor', 'ref_number']);
+        $noPlp = getValue($header, ['noPlp', 'NO_PLP', 'nomorPlp', 'no_plp']);
+        $tglPlp = parseDateDb(getValue($header, ['tglPlp', 'TGL_PLP', 'tanggalPlp', 'tgl_plp']));
+        $alasanReject = getValue($header, ['alasanReject', 'ALASAN_REJECT', 'alasan_reject', 'alasan']);
         $rawData = json_encode($item, JSON_UNESCAPED_UNICODE);
         
         $stmtInsert->execute([$kdKantor, $kdTps, $refNumber, $noBatalPlp, $tglBatalPlp, $noPlp, $tglPlp, $alasanReject, $rawData]);
@@ -699,16 +784,21 @@ function syncDokumenManual($pdo, $data) {
     ");
 
     foreach ($data as $item) {
-        $noDokumen = getValue($item, ['noDokumen', 'NO_DOKUMEN', 'nomorDokumen']);
-        $tglDokumen = parseDateDb(getValue($item, ['tglDokumen', 'TGL_DOKUMEN', 'tanggalDokumen']));
+        $header = $item['header'] ?? $item;
+        if (is_array($header) && isset($header[0]) && is_array($header[0])) {
+            $header = $header[0];
+        }
+
+        $noDokumen = getValue($header, ['noDokumen', 'NO_DOKUMEN', 'nomorDokumen', 'nomorDokumenInOut']);
+        $tglDokumen = parseDateDb(getValue($header, ['tglDokumen', 'TGL_DOKUMEN', 'tanggalDokumen', 'tanggalDokumenInOut']));
 
         if (!$noDokumen) continue;
 
         $stmtCheck->execute([$noDokumen, $tglDokumen]);
         if ($stmtCheck->fetchColumn()) continue;
 
-        $kdDokumen = getValue($item, ['kdDokumen', 'KD_DOKUMEN', 'kodeDokumen']);
-        $kdTps = getValue($item, ['kdTps', 'KD_TPS', 'kodeTps']);
+        $kdDokumen = getValue($header, ['kdDokumen', 'KD_DOKUMEN', 'kodeDokumen', 'kodeDokumenInOut']);
+        $kdTps = getValue($header, ['kdTps', 'KD_TPS', 'kodeTps', 'kodeGudang']);
         $rawData = json_encode($item, JSON_UNESCAPED_UNICODE);
 
         $stmtInsert->execute([$kdDokumen, $noDokumen, $tglDokumen, $kdTps, $rawData]);

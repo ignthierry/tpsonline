@@ -510,13 +510,14 @@
     function renderEndpointPage(endpoint, epDef, catDef) {
         const content = document.getElementById('main-content');
 
-        // Build form fields
+        // Build form fields with auto-filled defaults for Lini 2
         let formFieldsHtml = '';
         if (epDef.params && epDef.params.length > 0) {
             formFieldsHtml = epDef.params.map((p) => {
                 const inputType = p.type === 'date' ? 'date' : 'text';
                 const required = p.required ? 'required' : '';
                 const placeholder = p.placeholder || p.label;
+                const defVal = p.default || (p.name === 'kodeTps' ? 'PSU0' : (p.name === 'kodeGudang' ? 'GPSU' : ''));
                 return `
                     <div class="form-group">
                         <label for="param-${p.name}">${p.label} ${p.required ? '<span style="color:var(--accent-red)">*</span>' : ''}</label>
@@ -524,6 +525,7 @@
                                id="param-${p.name}" 
                                name="${p.name}" 
                                class="form-input" 
+                               value="${defVal}"
                                placeholder="${placeholder}"
                                data-format="${p.format || ''}"
                                ${required}>
@@ -601,9 +603,11 @@
         }
 
         // UI loading state
-        btn.disabled = true;
-        spinner.style.display = 'inline-block';
-        text.textContent = 'Mengambil data...';
+        if (btn) {
+            btn.disabled = true;
+            if (spinner) spinner.style.display = 'inline-block';
+            if (text) text.textContent = 'Mengambil data...';
+        }
 
         try {
             const response = await fetch(`api/proxy.php?${params.toString()}`);
@@ -630,9 +634,11 @@
             showToast('Terjadi kesalahan koneksi: ' + err.message, 'error');
             renderEmptyResults('Terjadi kesalahan koneksi');
         } finally {
-            btn.disabled = false;
-            spinner.style.display = 'none';
-            text.textContent = '🔍 Tarik Data';
+            if (btn) {
+                btn.disabled = false;
+                if (spinner) spinner.style.display = 'none';
+                if (text) text.textContent = '🔍 Tarik Data';
+            }
         }
     }
 
@@ -646,7 +652,13 @@
             return;
         }
 
-        // Normalize data to flat array of objects
+        // Khusus endpoint PLP / Batal PLP: Tampilkan UI Khusus Skenario & Rincian Lengkap Item
+        if ((endpoint && endpoint.includes('plp')) || (rawData && (rawData.responPlp || rawData.responBatal))) {
+            renderPlpSpecializedView(response, endpoint);
+            return;
+        }
+
+        // Normalize data to flat array of objects for other endpoints
         let rows = normalizeData(rawData);
 
         if (rows.length === 0) {
@@ -660,6 +672,307 @@
         state.sortColumn = null;
 
         renderResultsTable(rows, endpoint);
+    }
+
+    // ===== Specialized PLP & Batal PLP View Renderer =====
+    function renderPlpSpecializedView(response, endpoint) {
+        const container = document.getElementById('results-container');
+        const rawData = response.data;
+        let isBatal = (endpoint && endpoint.includes('batal')) || (rawData && !!rawData.responBatal);
+        let plpList = [];
+
+        if (rawData && rawData.responPlp && Array.isArray(rawData.responPlp)) {
+            plpList = rawData.responPlp;
+            isBatal = false;
+        } else if (rawData && rawData.responBatal && Array.isArray(rawData.responBatal)) {
+            plpList = rawData.responBatal;
+            isBatal = true;
+        } else if (Array.isArray(rawData)) {
+            plpList = rawData;
+        } else if (typeof rawData === 'object' && rawData !== null) {
+            plpList = [rawData];
+        }
+
+        if (plpList.length === 0) {
+            renderEmptyResults('Tidak ada berkas PLP yang ditemukan');
+            return;
+        }
+
+        let cardsHtml = '';
+
+        plpList.forEach((item, idx) => {
+            let header = item.header || item;
+            if (Array.isArray(header) && header.length > 0) header = header[0];
+            const containers = item.kontainer || (item.detil && item.detil.kontainer) || [];
+            const packages = item.kemasan || (item.detil && item.detil.kemasan) || [];
+
+            let scenarioCode = '';
+            let scenarioTitle = '';
+            let bannerClass = '';
+            let statusDesc = '';
+
+            if (isBatal) {
+                scenarioCode = 'TC-PLP-010';
+                scenarioTitle = 'TC-PLP-010 — Pembatalan PLP Disetujui';
+                bannerClass = 'banner-batal';
+                statusDesc = 'Permohonan pembatalan PLP telah BERHASIL DISETUJUI oleh Pejabat Bea Cukai.';
+            } else {
+                const totalCont = containers.length;
+                const totalKem = packages.length;
+                const totalItems = totalCont + totalKem;
+
+                const appCont = containers.filter(c => String(c.flagSetuju).toUpperCase() === 'Y' || c.flagSetuju === true).length;
+                const appKem = packages.filter(k => String(k.flagSetuju).toUpperCase() === 'Y' || k.flagSetuju === true).length;
+                const totalApp = appCont + appKem;
+                const hasRejectReason = !!(header.alasanReject && String(header.alasanReject).trim());
+
+                if (totalItems > 0 && totalApp === totalItems && !hasRejectReason) {
+                    scenarioCode = 'TC-PLP-005';
+                    scenarioTitle = 'TC-PLP-005 — Respon PLP Disetujui Semua';
+                    bannerClass = 'banner-approved';
+                    statusDesc = `Seluruh item (${totalApp}/${totalItems}) telah DISETUJUI oleh Bea Cukai untuk pemindahan ke Lini 2.`;
+                } else if (totalApp > 0 && (totalApp < totalItems || hasRejectReason)) {
+                    scenarioCode = 'TC-PLP-006';
+                    scenarioTitle = 'TC-PLP-006 — Respon PLP Disetujui Sebagian';
+                    bannerClass = 'banner-partial';
+                    statusDesc = `Permohonan PLP DISETUJUI SEBAGIAN (${totalApp} disetujui, ${totalItems - totalApp} ditolak) oleh Bea Cukai.`;
+                } else {
+                    scenarioCode = 'TC-PLP-007';
+                    scenarioTitle = 'TC-PLP-007 — Respon PLP Ditolak Semua';
+                    bannerClass = 'banner-rejected';
+                    statusDesc = 'Permohonan PLP DITOLAK SELURUHNYA oleh Pejabat Bea Cukai.';
+                }
+            }
+
+            // Build Containers Table HTML
+            let contRowsHtml = '';
+            if (containers.length > 0) {
+                contRowsHtml = containers.map((c, cIdx) => {
+                    const noCont = c.nomorKontainer || c.noCont || '-';
+                    const ukCont = c.ukuranKontainer || c.ukCont || '-';
+                    const jnsCont = c.jenisKontainer || c.jenisMuat || '-';
+                    const isApp = String(c.flagSetuju).toUpperCase() === 'Y' || c.flagSetuju === true;
+                    const tagHtml = isBatal 
+                        ? `<span class="plp-tag-status tag-batal">🚫 Dibatalkan</span>`
+                        : (isApp 
+                            ? `<span class="plp-tag-status tag-setuju">✅ Disetujui (Y)</span>` 
+                            : `<span class="plp-tag-status tag-tolak">❌ Ditolak (${c.flagSetuju || 'T'})</span>`);
+                    return `
+                        <tr>
+                            <td style="text-align:center; width:40px;">${cIdx + 1}</td>
+                            <td><b style="font-family:'JetBrains Mono',monospace; color:var(--text-primary); font-size:0.95rem;">${noCont}</b></td>
+                            <td><span class="badge-size">${ukCont} ft</span></td>
+                            <td>${jnsCont}</td>
+                            <td>${tagHtml}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Build Packages Table HTML
+            let kemRowsHtml = '';
+            if (packages.length > 0) {
+                kemRowsHtml = packages.map((k, kIdx) => {
+                    const jnsKem = k.jenisKemasan || '-';
+                    const jmlKem = k.jumlahKemasan ? Number(k.jumlahKemasan).toLocaleString('id-ID') : '-';
+                    const noBl = k.nomorBlAwb || k.noBlAwb || '-';
+                    const tglBl = k.tanggalBlAwb || k.tglBlAwb || '-';
+                    const isApp = String(k.flagSetuju).toUpperCase() === 'Y' || k.flagSetuju === true;
+                    const tagHtml = isBatal 
+                        ? `<span class="plp-tag-status tag-batal">🚫 Dibatalkan</span>`
+                        : (isApp 
+                            ? `<span class="plp-tag-status tag-setuju">✅ Disetujui (Y)</span>` 
+                            : `<span class="plp-tag-status tag-tolak">❌ Ditolak (${k.flagSetuju || 'T'})</span>`);
+                    return `
+                        <tr>
+                            <td style="text-align:center; width:40px;">${kIdx + 1}</td>
+                            <td><b>${jnsKem}</b></td>
+                            <td>${jmlKem}</td>
+                            <td><span style="font-family:'JetBrains Mono',monospace;">${noBl}</span></td>
+                            <td>${tglBl}</td>
+                            <td>${tagHtml}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Reject Alert Box
+            let rejectHtml = '';
+            if (header.alasanReject && String(header.alasanReject).trim()) {
+                rejectHtml = `
+                    <div class="plp-reject-alert">
+                        <span style="font-size:1.3rem; line-height:1;">⚠️</span>
+                        <div>
+                            <b style="display:block; margin-bottom:2px; font-weight:700;">Catatan / Alasan Penolakan Bea Cukai:</b>
+                            <span>${header.alasanReject}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Route & Vessel information
+            const noPlpVal = header.nomorPlp || header.noPlp || '-';
+            const tglPlpVal = header.tanggalPlp || header.tglPlp || '-';
+            const noBatalVal = header.nomorBatalPlp || header.noBatalPlp || '-';
+            const tglBatalVal = header.tanggalBatalPlp || header.tglBatalPlp || '-';
+            const noSuratVal = header.nomorSurat || header.noSurat || '-';
+            const tglSuratVal = header.tanggalSurat || header.tglSurat || '-';
+            const noBcVal = header.nomorBc11 || header.noBc11 || '-';
+            const tglBcVal = header.tanggalBc11 || header.tglBc11 || '-';
+            const tpsAsal = header.kodeTpsAsal || 'KOJA';
+            const tpsTujuan = header.kodeTpsTujuan || header.kodeTps || 'PSU0';
+            const gdgAsal = header.gudangAsal || 'TPK1';
+            const gdgTujuan = header.gudangTujuan || 'GPSU';
+            const angkut = (header.namaAngkut || '-') + (header.nomorVoyFlight ? ' / ' + header.nomorVoyFlight : '');
+
+            cardsHtml += `
+                <div class="plp-result-card">
+                    <!-- Scenario Banner -->
+                    <div class="plp-scenario-banner ${bannerClass}">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+                                <h3 style="margin:0; font-size:1.15rem; font-weight:800;">${scenarioTitle}</h3>
+                                <span class="plp-scenario-badge">${scenarioCode}</span>
+                            </div>
+                            <p style="margin:0; font-size:0.875rem; opacity:0.9;">${statusDesc}</p>
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="font-size:0.8rem; opacity:0.75;">TPS Lini 2:</span>
+                            <b style="display:block; font-size:1rem;">${tpsTujuan} (${gdgTujuan})</b>
+                        </div>
+                    </div>
+
+                    ${rejectHtml}
+
+                    <!-- Meta Information Grid -->
+                    <div class="plp-meta-grid">
+                        ${isBatal ? `
+                            <div class="plp-meta-item">
+                                <span class="plp-meta-label">No. Batal PLP</span>
+                                <span class="plp-meta-val" style="color:#22d3ee;">${noBatalVal}</span>
+                            </div>
+                            <div class="plp-meta-item">
+                                <span class="plp-meta-label">Tgl. Batal PLP</span>
+                                <span class="plp-meta-val">${tglBatalVal}</span>
+                            </div>
+                        ` : ''}
+                        <div class="plp-meta-item">
+                            <span class="plp-meta-label">No. PLP Asal</span>
+                            <span class="plp-meta-val">${noPlpVal}</span>
+                        </div>
+                        <div class="plp-meta-item">
+                            <span class="plp-meta-label">Tgl. PLP Asal</span>
+                            <span class="plp-meta-val">${tglPlpVal}</span>
+                        </div>
+                        ${!isBatal ? `
+                            <div class="plp-meta-item">
+                                <span class="plp-meta-label">No. & Tgl. Surat</span>
+                                <span class="plp-meta-val">${noSuratVal} (${tglSuratVal})</span>
+                            </div>
+                            <div class="plp-meta-item">
+                                <span class="plp-meta-label">No. & Tgl. BC 1.1</span>
+                                <span class="plp-meta-val">${noBcVal} (${tglBcVal})</span>
+                            </div>
+                        ` : ''}
+                        <div class="plp-meta-item">
+                            <span class="plp-meta-label">Rute Pemindahan PLP</span>
+                            <span class="plp-meta-val">${tpsAsal} ➔ <b style="color:#38bdf8;">${tpsTujuan} (Lini 2)</b></span>
+                        </div>
+                        <div class="plp-meta-item">
+                            <span class="plp-meta-label">Gudang Asal ➔ Tujuan</span>
+                            <span class="plp-meta-val">${gdgAsal} ➔ <b style="color:#38bdf8;">${gdgTujuan}</b></span>
+                        </div>
+                        ${!isBatal ? `
+                            <div class="plp-meta-item">
+                                <span class="plp-meta-label">Sarana Pengangkut</span>
+                                <span class="plp-meta-val">${angkut}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Containers Section -->
+                    ${containers.length > 0 ? `
+                        <div style="margin-top:20px;">
+                            <h4 style="margin:0 0 12px 0; font-size:0.95rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                                <span>📦</span> Rincian Kontainer (${containers.length} unit)
+                            </h4>
+                            <div class="table-wrapper" style="border:1px solid var(--border-medium); border-radius:var(--radius-md); overflow:hidden;">
+                                <table class="data-table" style="margin:0;">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:40px; text-align:center;">No</th>
+                                            <th>Nomor Kontainer</th>
+                                            <th>Ukuran</th>
+                                            <th>Jenis Muat</th>
+                                            <th>Status Persetujuan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${contRowsHtml}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Packages Section -->
+                    ${packages.length > 0 ? `
+                        <div style="margin-top:24px;">
+                            <h4 style="margin:0 0 12px 0; font-size:0.95rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                                <span>📦</span> Rincian Kemasan / Kargo (${packages.length} item)
+                            </h4>
+                            <div class="table-wrapper" style="border:1px solid var(--border-medium); border-radius:var(--radius-md); overflow:hidden;">
+                                <table class="data-table" style="margin:0;">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:40px; text-align:center;">No</th>
+                                            <th>Jenis Kemasan</th>
+                                            <th>Jumlah</th>
+                                            <th>Nomor B/L AWB</th>
+                                            <th>Tanggal B/L</th>
+                                            <th>Status Persetujuan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${kemRowsHtml}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+
+        container.innerHTML = `
+            <div class="results-section">
+                <div class="results-header" style="background:var(--bg-card); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:16px 20px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+                    <div class="results-info">
+                        <h4 style="margin:0; font-size:1.1rem; color:var(--text-primary);">Hasil Data Respon ${isBatal ? 'Batal PLP' : 'PLP'}</h4>
+                        <span class="results-count" style="font-size:0.85rem; color:var(--text-secondary);">${plpList.length} berkas permohonan</span>
+                    </div>
+                    <div class="results-actions" style="display:flex; gap:10px;">
+                        <button class="btn btn-sm btn-export" onclick="window.CeisaApp.exportCSV('${endpoint}')">📥 Export CSV</button>
+                        <button class="btn btn-sm btn-json" onclick="window.CeisaApp.showJSON()">{ } Raw JSON</button>
+                    </div>
+                </div>
+                ${cardsHtml}
+            </div>
+        `;
+    }
+
+    // ===== Simulate Scenario Handler =====
+    async function simulateScenario(scenario, endpoint) {
+        showToast(`Memuat simulasi skenario ${scenario}...`, 'info');
+        try {
+            const res = await fetch(`api/simulate_plp.php?scenario=${encodeURIComponent(scenario)}`);
+            const data = await res.json();
+            if (data.success) {
+                state.lastResponse = data;
+                showToast(`Simulasi ${scenario} berhasil dimuat & disinkronkan ke Database!`, 'success');
+                processAndRenderResults(data, endpoint);
+            } else {
+                showToast(data.message || 'Gagal memuat simulasi', 'error');
+            }
+        } catch (e) {
+            showToast('Kesalahan koneksi simulasi: ' + e.message, 'error');
+        }
     }
 
     function normalizeData(data) {

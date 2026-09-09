@@ -1,4 +1,5 @@
 <?php
+
 /**
  * API Handler: Coarri Codeco (CoCoCont) CEISA 4.0
  * 
@@ -38,7 +39,8 @@ try {
 /**
  * Normalisasi format tanggal ke YYYY-MM-DD
  */
-function normalizeDate($dateStr) {
+function normalizeDate($dateStr)
+{
     $dateStr = trim($dateStr);
     if (empty($dateStr)) {
         return date('Y-m-d');
@@ -56,7 +58,8 @@ function normalizeDate($dateStr) {
 /**
  * Format tanggal ke dd-MM-yyyy sesuai standar REST API CEISA 4.0
  */
-function formatDateDMY($val, $fallback = '') {
+function formatDateDMY($val, $fallback = '')
+{
     $val = trim((string)$val);
     if (empty($val) || $val === '0000-00-00' || $val === '00000000' || $val === '00-00-0000' || $val === '0000-00-00 00:00:00') {
         if (!empty($fallback)) {
@@ -80,7 +83,8 @@ function formatDateDMY($val, $fallback = '') {
 /**
  * Format waktu in/out ke dd-MM-yyyy HH:mm:ss sesuai standar REST API CEISA 4.0
  */
-function formatDateTimeDMY($val, $fallback = '') {
+function formatDateTimeDMY($val, $fallback = '')
+{
     $val = trim((string)$val);
     if (empty($val) || $val === '000000' || $val === '00000000000000' || $val === '0000-00-00 00:00:00') {
         if (!empty($fallback)) {
@@ -101,7 +105,8 @@ function formatDateTimeDMY($val, $fallback = '') {
 /**
  * Handle Penarikan Data dari Database TPP dan Konversi ke CEISA 4.0
  */
-function handleFetch() {
+function handleFetch()
+{
     global $pdo_tpp;
 
     if (!$pdo_tpp) {
@@ -310,9 +315,9 @@ function handleFetch() {
                 )";
         $stmt = $pdo_tpp->prepare($sql);
         $stmt->execute([
-            ':tglAwal1'  => $tglAwal, 
+            ':tglAwal1'  => $tglAwal,
             ':tglAkhir1' => $tglAkhir,
-            ':tglAwal2'  => $tglAwal, 
+            ':tglAwal2'  => $tglAwal,
             ':tglAkhir2' => $tglAkhir
         ]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -583,7 +588,8 @@ function handleFetch() {
 /**
  * Handle Pengiriman JSON Payload ke REST API CEISA 4.0
  */
-function handleSend() {
+function handleSend()
+{
     $rawInput = file_get_contents('php://input');
     $data = json_decode($rawInput, true);
 
@@ -592,7 +598,7 @@ function handleSend() {
     }
 
     $payload = $data['payload'] ?? $data;
-    
+
     // Validasi struktur minimal CEISA 4.0
     if (!isset($payload['header']) || !isset($payload['kontainer']) || !is_array($payload['kontainer'])) {
         jsonResponse(['success' => false, 'message' => 'Struktur payload harus memiliki objek header dan array kontainer'], 400);

@@ -48,6 +48,74 @@ $tables = [
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ",
 
+    // 1b. Tabel Riwayat Pengiriman Coarri Codeco Container (cococont.php)
+    'ceisa_cococont' => "
+        CREATE TABLE IF NOT EXISTS ceisa_cococont (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ref_number VARCHAR(50) NOT NULL,
+            kode_dokumen VARCHAR(10) NULL,
+            kd_tps VARCHAR(10) NULL,
+            kd_gudang VARCHAR(10) NULL,
+            no_kontainer VARCHAR(30) NOT NULL,
+            ukuran VARCHAR(10) NULL,
+            jenis_kontainer VARCHAR(10) NULL,
+            jenis_muat VARCHAR(5) NULL,
+            tipe_kontainer VARCHAR(10) NULL,
+            status_segel VARCHAR(30) NULL,
+            no_segel VARCHAR(50) NULL,
+            no_bl_awb VARCHAR(50) NULL,
+            tgl_bl_awb VARCHAR(20) NULL,
+            no_pos_bc11 VARCHAR(20) NULL,
+            consignee VARCHAR(150) NULL,
+            no_dok_inout VARCHAR(50) NULL,
+            tgl_dok_inout VARCHAR(20) NULL,
+            wk_inout VARCHAR(30) NULL,
+            no_polisi VARCHAR(20) NULL,
+            pel_muat VARCHAR(10) NULL,
+            pel_transit VARCHAR(10) NULL,
+            pel_bongkar VARCHAR(10) NULL,
+            raw_data JSON NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_cococont_ref (ref_number),
+            INDEX idx_cococont_cont (no_kontainer),
+            INDEX idx_cococont_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ",
+
+    // 1c. Tabel Riwayat Pengiriman Coarri Codeco Kemasan (cocokms.php)
+    'ceisa_cocokms' => "
+        CREATE TABLE IF NOT EXISTS ceisa_cocokms (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ref_number VARCHAR(50) NOT NULL,
+            kode_dokumen VARCHAR(10) NULL,
+            kd_tps VARCHAR(10) NULL,
+            kd_gudang VARCHAR(10) NULL,
+            jenis_kemasan VARCHAR(20) NULL,
+            jumlah_kemasan DECIMAL(12,2) DEFAULT 0,
+            seri_kemasan VARCHAR(50) NULL,
+            no_bl_awb VARCHAR(50) NULL,
+            tgl_bl_awb VARCHAR(20) NULL,
+            no_pos_bc11 VARCHAR(20) NULL,
+            consignee VARCHAR(150) NULL,
+            kontainer_asal VARCHAR(30) NULL,
+            no_dok_inout VARCHAR(50) NULL,
+            tgl_dok_inout VARCHAR(20) NULL,
+            wk_inout VARCHAR(30) NULL,
+            no_polisi VARCHAR(20) NULL,
+            pel_muat VARCHAR(10) NULL,
+            pel_transit VARCHAR(10) NULL,
+            pel_bongkar VARCHAR(10) NULL,
+            no_segel_bc VARCHAR(50) NULL,
+            tgl_segel_bc VARCHAR(20) NULL,
+            bruto DECIMAL(14,2) DEFAULT 0,
+            raw_data JSON NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_cocokms_ref (ref_number),
+            INDEX idx_cocokms_bl (no_bl_awb),
+            INDEX idx_cocokms_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ",
+
     // 2. PLP Responses
     'ceisa_respon_plp' => "
         CREATE TABLE IF NOT EXISTS ceisa_respon_plp (
@@ -367,19 +435,87 @@ $tables = [
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ",
 
-    // 14. Tracking TPS
-    'ceisa_tracking' => "
-        CREATE TABLE IF NOT EXISTS ceisa_tracking (
+    // 14. TPS Tracking Satuan (tps_tracking.php)
+    'ceisa_tps_tracking' => "
+        CREATE TABLE IF NOT EXISTS ceisa_tps_tracking (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            no_cont VARCHAR(50),
-            no_bl_awb VARCHAR(100),
-            tgl_bl_awb DATE,
-            status_tracking VARCHAR(100),
-            waktu_status DATETIME,
-            keterangan TEXT,
-            raw_data JSON,
+            no_cont VARCHAR(30) NOT NULL,
+            ukuran VARCHAR(10) NULL,
+            jenis_kontainer VARCHAR(10) NULL,
+            tipe_kontainer VARCHAR(20) NULL,
+            kd_tps VARCHAR(10) DEFAULT 'PSU0',
+            kd_gudang VARCHAR(10) DEFAULT 'CPSU',
+            departemen VARCHAR(20) DEFAULT 'TPP',
+            kode_kegiatan INT NOT NULL,
+            nama_kegiatan VARCHAR(100) NOT NULL,
+            waktu_kegiatan DATETIME NOT NULL,
+            no_bl_awb VARCHAR(100) NULL,
+            tgl_bl_awb DATE NULL,
+            kode_dokumen VARCHAR(10) NULL,
+            no_dokumen VARCHAR(50) NULL,
+            tgl_dokumen DATE NULL,
+            lokasi_block VARCHAR(20) NULL,
+            lokasi_slot VARCHAR(10) NULL,
+            lokasi_tier VARCHAR(10) NULL,
+            no_polisi VARCHAR(25) NULL,
+            stid VARCHAR(50) NULL,
+            status_kirim VARCHAR(30) DEFAULT 'SUCCESS',
+            http_code INT DEFAULT 200,
+            ceisa_id VARCHAR(100) NULL,
+            keterangan TEXT NULL,
+            raw_payload JSON NULL,
+            raw_response JSON NULL,
+            raw_json JSON NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_tracking (no_cont)
+            INDEX idx_cont (no_cont),
+            INDEX idx_kegiatan (kode_kegiatan),
+            INDEX idx_waktu (waktu_kegiatan),
+            INDEX idx_bl (no_bl_awb),
+            INDEX idx_dok (no_dokumen),
+            INDEX idx_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ",
+
+    // 14c. TPS Tracking Batch (tps_tracking_batch.php)
+    'ceisa_tps_tracking_batch' => "
+        CREATE TABLE IF NOT EXISTS ceisa_tps_tracking_batch (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            batch_id VARCHAR(50) NOT NULL,
+            no_cont VARCHAR(30) NOT NULL,
+            ukuran VARCHAR(10) NULL,
+            jenis_kontainer VARCHAR(10) NULL,
+            tipe_kontainer VARCHAR(20) NULL,
+            kd_tps VARCHAR(10) DEFAULT 'PSU0',
+            kd_gudang VARCHAR(10) DEFAULT 'CPSU',
+            departemen VARCHAR(20) DEFAULT 'TPP',
+            kode_kegiatan INT NOT NULL,
+            nama_kegiatan VARCHAR(100) NOT NULL,
+            waktu_kegiatan DATETIME NOT NULL,
+            no_bl_awb VARCHAR(100) NULL,
+            tgl_bl_awb DATE NULL,
+            kode_dokumen VARCHAR(10) NULL,
+            no_dokumen VARCHAR(50) NULL,
+            tgl_dokumen DATE NULL,
+            lokasi_block VARCHAR(20) NULL,
+            lokasi_slot VARCHAR(10) NULL,
+            lokasi_tier VARCHAR(10) NULL,
+            no_polisi VARCHAR(25) NULL,
+            stid VARCHAR(50) NULL,
+            status_kirim VARCHAR(30) DEFAULT 'SUCCESS',
+            http_code INT DEFAULT 200,
+            ceisa_id VARCHAR(100) NULL,
+            keterangan TEXT NULL,
+            raw_payload JSON NULL,
+            raw_response JSON NULL,
+            raw_json JSON NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_batch (batch_id),
+            INDEX idx_batch_cont (no_cont),
+            INDEX idx_batch_kegiatan (kode_kegiatan),
+            INDEX idx_batch_waktu (waktu_kegiatan),
+            INDEX idx_batch_bl (no_bl_awb),
+            INDEX idx_batch_dok (no_dokumen),
+            INDEX idx_batch_created (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ",
 

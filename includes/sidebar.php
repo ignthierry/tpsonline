@@ -70,19 +70,19 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                 <span class="chevron">›</span>
             </div>
             <div class="nav-subitems <?= $isKirimDataActive ? 'open' : '' ?>" id="kirimDataSubitems">
-                <!-- Coarri Codeco (Container) -->
+                <!-- Coarri Codeco (TPP) -->
                 <a href="cococont.php" class="nav-subitem-link <?= $isCoCoCont ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
                     <div class="nav-subitem <?= $isCoCoCont ? 'active' : '' ?>">
                         <span class="nav-sub-icon">📦</span>
-                        <span>Coarri Codeco (Container)</span>
+                        <span>Coarri Codeco (TPP)</span>
                         <span class="nav-badge-sm" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">CEISA 4.0</span>
                     </div>
                 </a>
-                <!-- Coarri Codeco (Kemasan) -->
+                <!-- Coarri Codeco (Gudang) -->
                 <a href="cocokms.php" class="nav-subitem-link <?= $isCoCoKms ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
                     <div class="nav-subitem <?= $isCoCoKms ? 'active' : '' ?>">
                         <span class="nav-sub-icon">📦</span>
-                        <span>Coarri Codeco (Kemasan)</span>
+                        <span>Coarri Codeco (Gudang)</span>
                         <span class="nav-badge-sm" style="background:rgba(139, 92, 246, 0.2); color:#a78bfa; border:1px solid rgba(139,92,246,0.3);">CEISA 4.0</span>
                     </div>
                 </a>
@@ -114,19 +114,57 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
         </div>
 
         <!-- Dynamic Categories -->
+        <?php
+        // Badge skenario pengujian Bea Cukai
+        $scenarioBadges = [
+            'get-respon-plp' => [
+                'label' => 'TC-005/6/7',
+                'style' => 'background:rgba(16, 185, 129, 0.2); color:#10b981; border:1px solid rgba(16,185,129,0.3); font-weight:700;',
+                'title' => 'Skenario TC-PLP-005, TC-PLP-006, TC-PLP-007 (Disetujui Semua, Sebagian, Ditolak)'
+            ],
+            'get-respon-batal-plp' => [
+                'label' => 'TC-010',
+                'style' => 'background:rgba(6, 182, 212, 0.2); color:#06b6d4; border:1px solid rgba(6,182,212,0.3); font-weight:700;',
+                'title' => 'Skenario TC-PLP-010 (Batal PLP Disetujui)'
+            ],
+            'get-respon-plp-tujuan' => [
+                'label' => 'Lini 2 (Alt)',
+                'style' => 'background:rgba(139, 92, 246, 0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.25);',
+                'title' => 'Alternatif Respon PLP TPS Tujuan Lini 2'
+            ],
+            'get-respon-batal-plp-tujuan' => [
+                'label' => 'Batal (Alt)',
+                'style' => 'background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.25);',
+                'title' => 'Alternatif Respon Batal PLP TPS Tujuan Lini 2'
+            ],
+            'get-dokumen-manual' => [
+                'label' => 'TC-012',
+                'style' => 'background:rgba(234, 179, 8, 0.2); color:#eab308; border:1px solid rgba(234,179,8,0.35); font-weight:700;',
+                'title' => 'Skenario TC-PLP-012 (TPS Mengambil Dokumen Manual)'
+            ],
+        ];
+        ?>
         <?php foreach ($endpoints as $catKey => $category): ?>
         <div class="nav-section">
             <div class="nav-item dynamic-cat-toggle" data-category="<?= e($catKey) ?>" style="cursor: pointer;">
                 <span class="nav-icon"><?= $category['icon'] ?></span>
                 <span><?= e($category['label']) ?></span>
+                <?php if ($catKey === 'plp'): ?>
+                    <span class="nav-badge-sm" style="background:rgba(16, 185, 129, 0.2); color:#10b981; border:1px solid rgba(16,185,129,0.35); margin-left:auto; margin-right:4px;">UJI COBA</span>
+                <?php endif; ?>
                 <span class="nav-badge"><?= count($category['endpoints']) ?></span>
                 <span class="chevron">›</span>
             </div>
             <div class="nav-subitems">
-                <?php foreach ($category['endpoints'] as $epKey => $ep): ?>
+                <?php foreach ($category['endpoints'] as $epKey => $ep): 
+                    $badgeInfo = $ep['badge'] ?? $scenarioBadges[$epKey] ?? null;
+                ?>
                 <a href="dashboard.php#<?= e($catKey) ?>/<?= e($epKey) ?>" class="nav-subitem-link" style="text-decoration:none; color:inherit;">
                     <div class="nav-subitem" data-endpoint="<?= e($epKey) ?>" data-category="<?= e($catKey) ?>">
-                        <?= e($ep['label']) ?>
+                        <span><?= e($ep['label']) ?></span>
+                        <?php if ($badgeInfo): ?>
+                            <span class="nav-badge-sm" style="<?= $badgeInfo['style'] ?>" title="<?= e($badgeInfo['title'] ?? '') ?>"><?= e($badgeInfo['label']) ?></span>
+                        <?php endif; ?>
                     </div>
                 </a>
                 <?php endforeach; ?>
@@ -147,7 +185,7 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                 <a href="report_cont.php" class="nav-subitem-link <?= $isReportCont ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
                     <div class="nav-subitem <?= $isReportCont ? 'active' : '' ?>">
                         <span class="nav-sub-icon">📊</span>
-                        <span>Laporan Coarri Codeco (Container)</span>
+                        <span>Laporan Coarri Codeco (TPP)</span>
                         <span class="nav-badge-sm" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">Container</span>
                     </div>
                 </a>
@@ -155,7 +193,7 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                 <a href="report_kms.php" class="nav-subitem-link <?= $isReportKms ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
                     <div class="nav-subitem <?= $isReportKms ? 'active' : '' ?>">
                         <span class="nav-sub-icon">📊</span>
-                        <span>Laporan Coarri Codeco (Kemasan)</span>
+                        <span>Laporan Coarri Codeco (Gudang)</span>
                         <span class="nav-badge-sm" style="background:rgba(139, 92, 246, 0.2); color:#a78bfa; border:1px solid rgba(139,92,246,0.3);">Kemasan</span>
                     </div>
                 </a>
