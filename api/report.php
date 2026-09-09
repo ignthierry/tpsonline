@@ -188,7 +188,78 @@ if ($action === 'detail_cont_ref') {
     }
 }
 
-if ($action === 'detail_kms_ref') {
+/**
+ * Helper deteksi Alur Pergerakan (In/Out) dan Kategori (kemasan, container_lcl, container_pjt)
+ */
+function detectRefTypeAndSubType($refNo, $serviceKey, $pdo) {
+    $refNo = trim((string)$refNo);
+    $detectedType = '';
+    $detectedSubType = '';
+
+    // Pola penomoran resmi dari cocokms.php:
+    // PSU0 + 6 digit tanggal (yymmdd) + 1 digit prefix (1-6) + 6 digit waktu (His)
+    // 1: Kemasan In | 2: Kemasan Out | 3: Cont LCL In | 4: Cont LCL Out | 5: Cont PJT In | 6: Cont PJT Out
+    if (preg_match('/^PSU0\d{6}([1-6])\d{6}/i', $refNo, $m)) {
+        $p = $m[1];
+        if ($p === '1') { $detectedType = 'In';  $detectedSubType = 'kemasan'; }
+        elseif ($p === '2') { $detectedType = 'Out'; $detectedSubType = 'kemasan'; }
+        elseif ($p === '3') { $detectedType = 'In';  $detectedSubType = 'container_lcl'; }
+        elseif ($p === '4') { $detectedType = 'Out'; $detectedSubType = 'container_lcl'; }
+        elseif ($p === '5') { $detectedType = 'In';  $detectedSubType = 'container_pjt'; }
+        elseif ($p === '6') { $detectedType = 'Out'; $detectedSubType = 'container_pjt'; }
+    }
+
+    // Jika pola tidak terbaca, periksa database tpsonline
+    if (empty($detectedType) || empty($detectedSubType)) {
+        if ($pdo) {
+            // Cek di ceisa_cocokms
+            $stmtK = $pdo->prepare("SELECT kode_dokumen FROM ceisa_cocokms WHERE ref_number = ? LIMIT 1");
+            $stmtK->execute([$refNo]);
+            $kRow = $stmtK->fetch(PDO::FETCH_ASSOC);
+            if ($kRow) {
+                $detectedSubType = 'kemasan';
+                $detectedType = ($kRow['kode_dokumen'] === '5') ? 'In' : 'Out';
+            } else {
+                // Cek di ceisa_cococont
+                $stmtC = $pdo->prepare("SELECT kode_dokumen, jenis_kontainer FROM ceisa_cococont WHERE ref_number = ? LIMIT 1");
+                $stmtC->execute([$refNo]);
+                $cRow = $stmtC->fetch(PDO::FETCH_ASSOC);
+                if ($cRow) {
+                    $detectedType = ($cRow['kode_dokumen'] === '5') ? 'In' : 'Out';
+                    $jns = strtoupper((string)($cRow['jenis_kontainer'] ?? ''));
+                    if (stripos($jns, 'PJT') !== false || stripos($refNo, 'PJT') !== false) {
+                        $detectedSubType = 'container_pjt';
+                    } else {
+                        $detectedSubType = 'container_lcl';
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback berdasarkan service gateway
+    if (empty($detectedSubType)) {
+        if ($serviceKey === 'coarri-codeco-kemasan') {
+            $detectedSubType = 'kemasan';
+        } elseif ($serviceKey === 'coarri-codeco-container') {
+            if (stripos($refNo, 'PJT') !== false) {
+                $detectedSubType = 'container_pjt';
+            } else {
+                $detectedSubType = 'container_lcl';
+            }
+        }
+    }
+    if (empty($detectedType)) {
+        $detectedType = 'In';
+    }
+
+    return [
+        'type' => $detectedType,
+        'subType' => $detectedSubType
+    ];
+}
+
+if ($action === 'detail_kms_ref' || $action === 'detail_ref') {
     $refNumber = trim((string)input('refNumber'));
     if (empty($refNumber)) {
         jsonResponse(['success' => false, 'message' => 'Reference number tidak boleh kosong'], 400);
@@ -221,8 +292,11 @@ if ($action === 'detail_kms_ref') {
         $cocoKmsRows = $stmtCocoKms->fetchAll(PDO::FETCH_ASSOC);
 
         $packages = [];
+        $containers = [];
+        $dataType = 'kemasan';
 
         if (!empty($cocoKmsRows)) {
+            $dataType = 'kemasan';
             foreach ($cocoKmsRows as $k) {
                 $rawDetail = !empty($k['raw_data']) ? json_decode($k['raw_data'], true) : [];
                 $packages[] = [
@@ -242,67 +316,124 @@ if ($action === 'detail_kms_ref') {
                 ];
             }
         } else {
-            // Fallback ke ceisa_sppb_kemasan / ceisa_plp_kemasan (untuk data historis pengujian lama)
-            $stmtSppb = $pdo_tpsonline->prepare("
-                SELECT id, car, no_sppb, jml_kemasan, jns_kemasan, kd_jns_kemasan, raw_data, created_at 
-                FROM ceisa_sppb_kemasan 
-                WHERE car = ?
+            // Cek apakah ref ini merupakan kontainer (ceisa_cococont)
+            $stmtCocoCont = $pdo_tpsonline->prepare("
+                SELECT * FROM ceisa_cococont 
+                WHERE ref_number = ?
                 ORDER BY id ASC
             ");
-            $stmtSppb->execute([$refNumber]);
-            $sppbRows = $stmtSppb->fetchAll(PDO::FETCH_ASSOC);
+            $stmtCocoCont->execute([$refNumber]);
+            $cocoContRows = $stmtCocoCont->fetchAll(PDO::FETCH_ASSOC);
 
-            $stmtPlp = $pdo_tpsonline->prepare("
-                SELECT id, idTpsPlp, jenisKemasan, jumlahKemasan, nomorPosBc11, nomorBlAwb, tanggalBlAwb, consignee, flagSetuju 
-                FROM ceisa_plp_kemasan 
-                WHERE idTpsPlp = ?
-                ORDER BY id ASC
-            ");
-            $stmtPlp->execute([$refNumber]);
-            $plpRows = $stmtPlp->fetchAll(PDO::FETCH_ASSOC);
-
-            if (!empty($sppbRows)) {
-                foreach ($sppbRows as $s) {
-                    $rawDetail = !empty($s['raw_data']) ? json_decode($s['raw_data'], true) : [];
-                    $packages[] = [
-                        'jenisKemasan'        => $s['jns_kemasan'],
-                        'jumlahKemasan'       => (float)($s['jml_kemasan'] ?? ($rawDetail['jumlahKemasan'] ?? 0)),
-                        'noSppb'              => $s['no_sppb'],
-                        'noBlAwb'             => $rawDetail['nomorBlAwb'] ?? ($rawDetail['noBlAwb'] ?? '-'),
-                        'tanggalBlAwb'        => $rawDetail['tanggalBlAwb'] ?? '-',
-                        'nomorPosBc11'        => $rawDetail['nomorPosBc11'] ?? '-',
-                        'consignee'           => $rawDetail['consignee'] ?? '-',
-                        'kontainerAsal'       => $rawDetail['kontainerAsal'] ?? '-',
-                        'nomorPolisi'         => $rawDetail['nomorPolisi'] ?? '-',
-                        'waktuInOut'          => $rawDetail['waktuInOut'] ?? '-',
-                        'noSegelBc'           => $rawDetail['nomorSegelBc'] ?? '-',
+            if (!empty($cocoContRows)) {
+                $dataType = 'container';
+                foreach ($cocoContRows as $c) {
+                    $rawDetail = !empty($c['raw_data']) ? json_decode($c['raw_data'], true) : [];
+                    $containers[] = [
+                        'noCont'              => $c['no_kontainer'],
+                        'ukuran'              => (!empty($c['ukuran']) ? $c['ukuran'] . ' ft' : '20 ft'),
+                        'jenisCont'           => $c['jenis_kontainer'] ?? 'LCL',
+                        'jenisMuat'           => 'Isi (LCL)',
+                        'noSppb'              => $c['no_dok_inout'] ?: '-',
+                        'statusSegel'         => $c['no_segel'] ? 'Tersegel' : '-',
+                        'noSegel'             => $c['no_segel'] ?: '-',
+                        'nomorPosBc11'        => $c['no_pos_bc11'] ?: '-',
+                        'noBlAwb'             => $c['no_bl_awb'] ?: '-',
+                        'tanggalBlAwb'        => $c['tgl_bl_awb'] ?: '-',
+                        'consignee'           => $c['consignee'] ?: '-',
+                        'nomorDokumenInOut'   => $c['no_dok_inout'] ?: '-',
+                        'tanggalDokumenInOut' => $c['tgl_dok_inout'] ?: '-',
+                        'waktuInOut'          => $c['wk_inout'] ?: '-',
+                        'nomorPolisi'         => $c['no_polisi'] ?: '-',
                         'bruto'               => $rawDetail['bruto'] ?? 0,
                         'raw'                 => $rawDetail
                     ];
                 }
-            } elseif (!empty($plpRows)) {
-                foreach ($plpRows as $plp) {
-                    $packages[] = [
-                        'jenisKemasan'        => $plp['jenisKemasan'],
-                        'jumlahKemasan'       => (float)($plp['jumlahKemasan'] ?? 0),
-                        'noSppb'              => '-',
-                        'noBlAwb'             => $plp['nomorBlAwb'],
-                        'tanggalBlAwb'        => $plp['tanggalBlAwb'],
-                        'nomorPosBc11'        => $plp['nomorPosBc11'],
-                        'consignee'           => $plp['consignee'],
-                        'kontainerAsal'       => '-',
-                        'nomorPolisi'         => '-',
-                        'waktuInOut'          => '-',
-                        'noSegelBc'           => '-',
-                        'bruto'               => 0,
-                        'raw'                 => $plp
-                    ];
+            } else {
+                // Fallback ke ceisa_sppb_kemasan / ceisa_plp_kemasan
+                $stmtSppb = $pdo_tpsonline->prepare("
+                    SELECT id, car, no_sppb, jml_kemasan, jns_kemasan, kd_jns_kemasan, raw_data, created_at 
+                    FROM ceisa_sppb_kemasan 
+                    WHERE car = ?
+                    ORDER BY id ASC
+                ");
+                $stmtSppb->execute([$refNumber]);
+                $sppbRows = $stmtSppb->fetchAll(PDO::FETCH_ASSOC);
+
+                if (!empty($sppbRows)) {
+                    $dataType = 'kemasan';
+                    foreach ($sppbRows as $s) {
+                        $rawDetail = !empty($s['raw_data']) ? json_decode($s['raw_data'], true) : [];
+                        $packages[] = [
+                            'jenisKemasan'        => $s['jns_kemasan'],
+                            'jumlahKemasan'       => (float)($s['jml_kemasan'] ?? ($rawDetail['jumlahKemasan'] ?? 0)),
+                            'noSppb'              => $s['no_sppb'],
+                            'noBlAwb'             => $rawDetail['nomorBlAwb'] ?? ($rawDetail['noBlAwb'] ?? '-'),
+                            'tanggalBlAwb'        => $rawDetail['tanggalBlAwb'] ?? '-',
+                            'nomorPosBc11'        => $rawDetail['nomorPosBc11'] ?? '-',
+                            'consignee'           => $rawDetail['consignee'] ?? '-',
+                            'kontainerAsal'       => $rawDetail['kontainerAsal'] ?? '-',
+                            'nomorPolisi'         => $rawDetail['nomorPolisi'] ?? '-',
+                            'waktuInOut'          => $rawDetail['waktuInOut'] ?? '-',
+                            'noSegelBc'           => $rawDetail['nomorSegelBc'] ?? '-',
+                            'bruto'               => $rawDetail['bruto'] ?? 0,
+                            'raw'                 => $rawDetail
+                        ];
+                    }
+                } elseif (!empty($parsedRequest['detil']) && is_array($parsedRequest['detil'])) {
+                    // Fallback langsung dari payload log kemasan
+                    $dataType = 'kemasan';
+                    foreach ($parsedRequest['detil'] as $d) {
+                        $packages[] = [
+                            'jenisKemasan'        => $d['kodeKemasan'] ?? ($d['jenisKemasan'] ?? 'PK'),
+                            'jumlahKemasan'       => (float)($d['jumlahKemasan'] ?? 1),
+                            'noSppb'              => $d['nomorDokumenInOut'] ?? '-',
+                            'noBlAwb'             => $d['nomorBlAwb'] ?? ($d['noBlAwb'] ?? '-'),
+                            'tanggalBlAwb'        => $d['tanggalBlAwb'] ?? '-',
+                            'nomorPosBc11'        => $d['nomorPosBc11'] ?? '-',
+                            'consignee'           => $d['consignee'] ?? '-',
+                            'kontainerAsal'       => $d['kontainerAsal'] ?? '-',
+                            'nomorPolisi'         => $d['nomorPolisi'] ?? '-',
+                            'waktuInOut'          => $d['waktuInOut'] ?? '-',
+                            'noSegelBc'           => $d['nomorSegelBc'] ?? '-',
+                            'bruto'               => (float)($d['bruto'] ?? 0),
+                            'raw'                 => $d
+                        ];
+                    }
+                } elseif (!empty($parsedRequest['kontainer']) && is_array($parsedRequest['kontainer'])) {
+                    // Fallback langsung dari payload log kontainer
+                    $dataType = 'container';
+                    foreach ($parsedRequest['kontainer'] as $c) {
+                        $containers[] = [
+                            'noCont'              => $c['nomorKontainer'] ?? '-',
+                            'ukuran'              => (!empty($c['ukuranKontainer']) ? $c['ukuranKontainer'] . ' ft' : '20 ft'),
+                            'jenisCont'           => $c['jenisKontainer'] ?? 'LCL',
+                            'jenisMuat'           => 'Isi (LCL)',
+                            'noSppb'              => $c['nomorDokumenInOut'] ?? '-',
+                            'statusSegel'         => !empty($c['nomorSegelBc']) ? 'Tersegel' : '-',
+                            'noSegel'             => $c['nomorSegelBc'] ?? ($c['nomorSegel'] ?? '-'),
+                            'nomorPosBc11'        => $c['nomorPosBc11'] ?? '-',
+                            'noBlAwb'             => $c['nomorBlAwb'] ?? ($c['noBlAwb'] ?? '-'),
+                            'tanggalBlAwb'        => $c['tanggalBlAwb'] ?? '-',
+                            'consignee'           => $c['consignee'] ?? '-',
+                            'nomorDokumenInOut'   => $c['nomorDokumenInOut'] ?? '-',
+                            'tanggalDokumenInOut' => $c['tanggalDokumenInOut'] ?? '-',
+                            'waktuInOut'          => $c['waktuInOut'] ?? '-',
+                            'nomorPolisi'         => $c['nomorPolisi'] ?? '-',
+                            'bruto'               => $c['bruto'] ?? 0,
+                            'raw'                 => $c
+                        ];
+                    }
+                } else {
+                    $refMeta = detectRefTypeAndSubType($refNumber, '', $pdo_tpsonline);
+                    $dataType = ($refMeta['subType'] === 'kemasan') ? 'kemasan' : 'container';
                 }
             }
         }
 
         jsonResponse([
             'success'          => true,
+            'dataType'         => $dataType,
             'referenceNumber'  => $refNumber,
             'header'           => $header,
             'log'              => $logData ? [
@@ -317,13 +448,15 @@ if ($action === 'detail_kms_ref') {
             ] : null,
             'package_count'    => count($packages),
             'packages'         => $packages,
+            'container_count'  => count($containers),
+            'containers'       => $containers,
             'raw_payload'      => $parsedRequest
         ]);
 
     } catch (Exception $e) {
         jsonResponse([
             'success' => false,
-            'message' => 'Gagal mengambil detail referensi kemasan: ' . $e->getMessage()
+            'message' => 'Gagal mengambil detail referensi: ' . $e->getMessage()
         ], 500);
     }
 }
@@ -335,9 +468,25 @@ if ($action === 'cek_terkirim') {
     $tglAwal = normalizeDateDmy($tglAwalRaw);
     $tglAkhir = normalizeDateDmy($tglAkhirRaw);
 
+    $type = strtoupper(trim((string)input('type', ''))); // 'IN', 'OUT', atau ''
+    $subType = strtolower(trim((string)input('subType', ''))); // 'kemasan', 'container_lcl', 'container_pjt', 'container', atau ''
     $category = strtolower(trim($_REQUEST['category'] ?? $_GET['category'] ?? $_POST['category'] ?? $_REQUEST['service'] ?? $_GET['service'] ?? $_POST['service'] ?? ''));
 
+    // Normalisasi subType dari parameter category jika subType tidak disertakan
+    if (empty($subType)) {
+        if ($category === 'kemasan' || $category === 'coarri-codeco-kemasan' || $category === 'cocokms') {
+            $subType = 'kemasan';
+        } elseif ($category === 'container_lcl') {
+            $subType = 'container_lcl';
+        } elseif ($category === 'container_pjt') {
+            $subType = 'container_pjt';
+        } elseif ($category === 'container' || $category === 'coarri-codeco-container' || $category === 'cococont') {
+            $subType = 'container';
+        }
+    }
+
     try {
+        global $pdo_tpsonline;
         $client = new CeisaClient();
         $apiRes = $client->get('cek-data-terkirim', [
             'tanggalAwal' => $tglAwal,
@@ -354,28 +503,59 @@ if ($action === 'cek_terkirim') {
 
         if (is_array($responData)) {
             foreach ($responData as $serviceKey => $serviceVal) {
-                // Filter berdasarkan kategori jika ditentukan
-                if ($category === 'container' || $category === 'coarri-codeco-container' || $category === 'cococont') {
-                    if ($serviceKey !== 'coarri-codeco-container') continue;
-                } elseif ($category === 'kemasan' || $category === 'coarri-codeco-kemasan' || $category === 'cocokms') {
-                    if ($serviceKey !== 'coarri-codeco-kemasan') continue;
+                // Filter awal berdasarkan endpoint service bila subType spesifik
+                if ($subType === 'kemasan' && $serviceKey !== 'coarri-codeco-kemasan') {
+                    continue;
+                }
+                if (in_array($subType, ['container_lcl', 'container_pjt', 'container']) && $serviceKey !== 'coarri-codeco-container') {
+                    continue;
                 }
 
-                $serviceList[] = $serviceKey;
-                $jumlah = $serviceVal['jumlah'] ?? 0;
-                $totalJumlah += $jumlah;
-
                 $refs = $serviceVal['referenceNumber'] ?? [];
-                if (is_array($refs)) {
-                    foreach ($refs as $refNo) {
-                        $tableRows[] = [
-                            'referenceNumber' => $refNo,
-                            'service' => $serviceKey,
-                            'serviceLabel' => ucwords(str_replace(['-', '_'], ' ', $serviceKey)),
-                            'status' => 'TERKIRIM DI CEISA 4.0',
-                            'tglAwal' => $tglAwal,
-                            'tglAkhir' => $tglAkhir
-                        ];
+                if (!is_array($refs)) continue;
+
+                foreach ($refs as $refNo) {
+                    $refNo = trim((string)$refNo);
+                    if (empty($refNo)) continue;
+
+                    $meta = detectRefTypeAndSubType($refNo, $serviceKey, $pdo_tpsonline);
+
+                    // Filter Kategori / SubType jika ditentukan
+                    if ($subType === 'kemasan' && $meta['subType'] !== 'kemasan') {
+                        continue;
+                    }
+                    if ($subType === 'container_lcl' && $meta['subType'] !== 'container_lcl') {
+                        continue;
+                    }
+                    if ($subType === 'container_pjt' && $meta['subType'] !== 'container_pjt') {
+                        continue;
+                    }
+
+                    // Filter Alur Pergerakan (In / Out) jika ditentukan
+                    if (!empty($type)) {
+                        if (strcasecmp($type, $meta['type']) !== 0) {
+                            continue;
+                        }
+                    }
+
+                    $subTypeLabel = ($meta['subType'] === 'kemasan') ? 'Kemasan' : (($meta['subType'] === 'container_pjt') ? 'Container PJT' : 'Container LCL');
+                    $typeLabel = ($meta['type'] === 'In') ? 'Gate-In (Pemasukan)' : 'Gate-Out (Pengeluaran)';
+
+                    $tableRows[] = [
+                        'referenceNumber' => $refNo,
+                        'service'         => $serviceKey,
+                        'serviceLabel'    => ucwords(str_replace(['-', '_'], ' ', $serviceKey)),
+                        'type'            => $meta['type'],
+                        'typeLabel'       => $typeLabel,
+                        'subType'         => $meta['subType'],
+                        'subTypeLabel'    => $subTypeLabel,
+                        'status'          => 'TERKIRIM DI CEISA 4.0',
+                        'tglAwal'         => $tglAwal,
+                        'tglAkhir'        => $tglAkhir
+                    ];
+                    $totalJumlah++;
+                    if (!in_array($serviceKey, $serviceList)) {
+                        $serviceList[] = $serviceKey;
                     }
                 }
             }
@@ -386,26 +566,28 @@ if ($action === 'cek_terkirim') {
         $isNotFound = stripos($rawDetail, 'not found') !== false || stripos($rawDetail, 'tidak ada') !== false;
 
         jsonResponse([
-            'success' => $isSuccess,
-            'code' => $httpCode,
-            'message' => $isNotFound ? 'Tidak ada data pengiriman pada rentang tanggal tersebut.' : ($apiRes['message'] ?? 'Berhasil mengambil data terkirim'),
+            'success'      => $isSuccess,
+            'code'         => $httpCode,
+            'message'      => $isNotFound ? 'Tidak ada data pengiriman pada rentang tanggal tersebut.' : ($apiRes['message'] ?? 'Berhasil mengambil data terkirim'),
             'total_jumlah' => $totalJumlah,
-            'service_count' => count($serviceList),
-            'services' => $serviceList,
-            'tglAwal' => $tglAwal,
-            'tglAkhir' => $tglAkhir,
-            'count' => count($tableRows),
-            'rows' => $tableRows,
-            'raw' => $apiRes
+            'service_count'=> count($serviceList),
+            'services'     => $serviceList,
+            'type'         => $type ?: 'ALL',
+            'subType'      => $subType ?: 'ALL',
+            'tglAwal'      => $tglAwal,
+            'tglAkhir'     => $tglAkhir,
+            'count'        => count($tableRows),
+            'rows'         => $tableRows,
+            'raw'          => $apiRes
         ]);
 
     } catch (Exception $e) {
         jsonResponse([
             'success' => false,
-            'code' => 500,
+            'code'    => 500,
             'message' => 'Kesalahan saat menghubungi API Gateway: ' . $e->getMessage(),
-            'rows' => [],
-            'count' => 0
+            'rows'    => [],
+            'count'   => 0
         ], 500);
     }
 }

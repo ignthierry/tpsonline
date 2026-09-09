@@ -111,13 +111,18 @@ return [
 
     // ===== Database Settings =====
     'db' => [
-        'host' => env('DB_HOST', '192.168.0.192'),
+        'host' => env('DB_HOST', '192.168.0.191'),
         'user' => env('DB_USER', 'itpsu'),
-        'pass' => env('DB_PASS', '123123'),
+        'pass' => env('DB_PASS', 'Psuit@2024'),
         'names' => [
             'tpsonline' => env('DB_NAME_TPSONLINE', 'tpsonline'),
             'tpp'       => env('DB_NAME_TPP', 'tpp_primamas'),
             'primamas'  => env('DB_NAME_PRIMAMAS', 'primamas'),
         ]
     ],
+
+    // ===== TPS & Gudang Settings =====
+    'tps_kode'         => env('TPS_KODE', 'PSU0'),
+    'gudang_kode'      => env('GUDANG_KODE', 'GPSU'),
+    'gudang_kode_cpsu' => env('GUDANG_KODE_CPSU', 'CPSU'),
 ];

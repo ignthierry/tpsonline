@@ -819,10 +819,10 @@
             const tglSuratVal = header.tanggalSurat || header.tglSurat || '-';
             const noBcVal = header.nomorBc11 || header.noBc11 || '-';
             const tglBcVal = header.tanggalBc11 || header.tglBc11 || '-';
-            const tpsAsal = header.kodeTpsAsal || 'KOJA';
-            const tpsTujuan = header.kodeTpsTujuan || header.kodeTps || 'PSU0';
-            const gdgAsal = header.gudangAsal || 'TPK1';
-            const gdgTujuan = header.gudangTujuan || 'GPSU';
+            const tpsAsal = header.kodeTpsAsal || header.kdTpsAsal || header.tpsAsal || '-';
+            const tpsTujuan = header.kodeTpsTujuan || header.kdTpsTujuan || header.kodeTps || 'PSU0';
+            const gdgAsal = header.kodeGudangAsal || header.gudangAsal || header.kdGudangAsal || '-';
+            const gdgTujuan = header.kodeGudangTujuan || header.gudangTujuan || header.kdGudangTujuan || '-';
             const angkut = (header.namaAngkut || '-') + (header.nomorVoyFlight ? ' / ' + header.nomorVoyFlight : '');
 
             cardsHtml += `
@@ -838,7 +838,7 @@
                         </div>
                         <div style="text-align:right;">
                             <span style="font-size:0.8rem; opacity:0.75;">TPS Lini 2:</span>
-                            <b style="display:block; font-size:1rem;">${tpsTujuan} (${gdgTujuan})</b>
+                            <b style="display:block; font-size:1rem;">${tpsTujuan} ${gdgTujuan !== '-' ? '(' + gdgTujuan + ')' : ''}</b>
                         </div>
                     </div>
 

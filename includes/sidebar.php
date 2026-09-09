@@ -13,8 +13,9 @@ $isReportTracking = ($currentPage === 'report_tracking.php');
 $isReportTrackingBatch = ($currentPage === 'report_tracking_batch.php');
 $isLaporanYor = ($currentPage === 'laporan_yor.php');
 $isReportYor = ($currentPage === 'report_yor.php');
+$isPermohonanPlp = ($currentPage === 'permohonan_plp.php');
 // Check if any Kirim Data sub-page is active (for auto-expanding the submenu)
-$isKirimDataActive = ($isCoCoCont || $isCoCoKms || $isTpsTracking || $isTpsTrackingBatch || $isLaporanYor);
+$isKirimDataActive = ($isCoCoCont || $isCoCoKms || $isTpsTracking || $isTpsTrackingBatch || $isLaporanYor || $isPermohonanPlp);
 // Check if any Laporan sub-page is active (for auto-expanding the submenu)
 $isLaporanActive = ($isReportCont || $isReportKms || $isReportTracking || $isReportTrackingBatch || $isReportYor);
 if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
@@ -66,7 +67,7 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
             <div class="nav-item kirim-data-toggle <?= $isKirimDataActive ? 'expanded' : '' ?>" id="kirimDataToggle" style="cursor: pointer;">
                 <span class="nav-icon">📤</span>
                 <span>Kirim Data</span>
-                <span class="nav-badge" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">5</span>
+                <span class="nav-badge" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">6</span>
                 <span class="chevron">›</span>
             </div>
             <div class="nav-subitems <?= $isKirimDataActive ? 'open' : '' ?>" id="kirimDataSubitems">
@@ -108,6 +109,14 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                         <span class="nav-sub-icon">📈</span>
                         <span>Laporan YOR (Yard Occupancy)</span>
                         <span class="nav-badge-sm" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">YOR</span>
+                    </div>
+                </a>
+                <!-- Permohonan PLP (POST) -->
+                <a href="permohonan_plp.php" class="nav-subitem-link <?= $isPermohonanPlp ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
+                    <div class="nav-subitem <?= $isPermohonanPlp ? 'active' : '' ?>">
+                        <span class="nav-sub-icon">📤</span>
+                        <span>Permohonan PLP (POST)</span>
+                        <span class="nav-badge-sm" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3); font-weight:700;">POST</span>
                     </div>
                 </a>
             </div>
@@ -156,6 +165,14 @@ if (!isset($endpoints) && function_exists('getEndpointDefinitions')) {
                 <span class="chevron">›</span>
             </div>
             <div class="nav-subitems">
+                <?php if ($catKey === 'plp'): ?>
+                <a href="permohonan_plp.php" class="nav-subitem-link <?= $isPermohonanPlp ? 'active' : '' ?>" style="text-decoration:none; color:inherit;">
+                    <div class="nav-subitem <?= $isPermohonanPlp ? 'active' : '' ?>" style="border-left: 2px solid #3b82f6;">
+                        <span style="font-weight:600; color:var(--text-primary);">Permohonan PLP (POST)</span>
+                        <span class="nav-badge-sm" style="background:rgba(59, 130, 246, 0.2); color:#3b82f6; border:1px solid rgba(59,130,246,0.3); font-weight:700;">POST</span>
+                    </div>
+                </a>
+                <?php endif; ?>
                 <?php foreach ($category['endpoints'] as $epKey => $ep): 
                     $badgeInfo = $ep['badge'] ?? $scenarioBadges[$epKey] ?? null;
                 ?>

@@ -474,8 +474,8 @@ if (!function_exists('getContainerTimelineData')) {
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
                     'jenisKontainer'  => $contStatus,
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'CPSU',
+                    'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                    'kodeGudang'      => env('GUDANG_KODE_CPSU', 'CPSU'),
                     'kodeKegiatan'    => 5,
                     'waktuKegiatan'   => $waktuGateIn
                 ];
@@ -548,8 +548,8 @@ if (!function_exists('getContainerTimelineData')) {
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
                     'jenisKontainer'  => $contStatus,
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'CPSU',
+                    'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                    'kodeGudang'      => env('GUDANG_KODE_CPSU', 'CPSU'),
                     'kodeKegiatan'    => 17,
                     'waktuKegiatan'   => $waktuStacking,
                     'block'           => $yardBlockClean,
@@ -630,8 +630,8 @@ if (!function_exists('getContainerTimelineData')) {
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
                     'jenisKontainer'  => $contStatus,
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'CPSU',
+                    'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                    'kodeGudang'      => env('GUDANG_KODE_CPSU', 'CPSU'),
                     'kodeKegiatan'    => 21,
                     'waktuKegiatan'   => $waktuBehandle,
                     'block'           => $yardBlockClean ?: 'BLOK BHD',
@@ -690,8 +690,8 @@ if (!function_exists('getContainerTimelineData')) {
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
                     'jenisKontainer'  => $contStatus,
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'CPSU',
+                    'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                    'kodeGudang'      => env('GUDANG_KODE_CPSU', 'CPSU'),
                     'kodeKegiatan'    => 22,
                     'waktuKegiatan'   => $waktuShifting,
                     'block'           => $shiftBlock ?: ($yardBlockClean ?: 'YARD'),
@@ -757,8 +757,8 @@ if (!function_exists('getContainerTimelineData')) {
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
                     'jenisKontainer'  => $contStatus,
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'CPSU',
+                    'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                    'kodeGudang'      => env('GUDANG_KODE_CPSU', 'CPSU'),
                     'kodeKegiatan'    => 23,
                     'waktuKegiatan'   => $waktuStripping,
                     'kodeDokumen'     => '3',
@@ -819,8 +819,8 @@ if (!function_exists('getContainerTimelineData')) {
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
                     'jenisKontainer'  => $contStatus,
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'CPSU',
+                    'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                    'kodeGudang'      => env('GUDANG_KODE_CPSU', 'CPSU'),
                     'kodeKegiatan'    => 19, // 19 = TRUCK IN LINI 2
                     'waktuKegiatan'   => $waktuTruckIn
                 ];
@@ -882,8 +882,8 @@ if (!function_exists('getContainerTimelineData')) {
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
                     'jenisKontainer'  => $contStatus,
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'CPSU',
+                    'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                    'kodeGudang'      => env('GUDANG_KODE_CPSU', 'CPSU'),
                     'kodeKegiatan'    => 20, // 20 = PICKUP LINI 2
                     'waktuKegiatan'   => $waktuPickup
                 ];
@@ -946,8 +946,8 @@ if (!function_exists('getContainerTimelineData')) {
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $contSize,
                     'jenisKontainer'  => $contStatus,
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'CPSU',
+                    'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                    'kodeGudang'      => env('GUDANG_KODE_CPSU', 'CPSU'),
                     'kodeKegiatan'    => 6, // 6 = GATE OUT LINI 2
                     'waktuKegiatan'   => $waktuGateOut
                 ];
@@ -1125,8 +1125,8 @@ if (!function_exists('getContainerTimelineData')) {
                 'nomorKontainer'  => $noContClean,
                 'ukuranKontainer' => $sz,
                 'jenisKontainer'  => '7', // 7 = LCL
-                'kodeTps'         => 'PSU0',
-                'kodeGudang'      => 'GPSU',
+                'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                'kodeGudang'      => env('GUDANG_KODE', 'GPSU'),
                 'kodeKegiatan'    => 5,
                 'waktuKegiatan'   => $wMasuk ?: date('d-m-Y H:i:s')
             ];
@@ -1166,8 +1166,8 @@ if (!function_exists('getContainerTimelineData')) {
                 'nomorKontainer'  => $noContClean,
                 'ukuranKontainer' => $sz,
                 'jenisKontainer'  => '7',
-                'kodeTps'         => 'PSU0',
-                'kodeGudang'      => 'GPSU',
+                'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                'kodeGudang'      => env('GUDANG_KODE', 'GPSU'),
                 'kodeKegiatan'    => 23,
                 'waktuKegiatan'   => $wStripping ?: ($wMasuk ?: date('d-m-Y H:i:s'))
             ];
@@ -1231,8 +1231,8 @@ if (!function_exists('getContainerTimelineData')) {
                     'nomorKontainer'  => $noContClean,
                     'ukuranKontainer' => $sz,
                     'jenisKontainer'  => '7', // 7 = LCL
-                    'kodeTps'         => 'PSU0',
-                    'kodeGudang'      => 'GPSU',
+                    'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                    'kodeGudang'      => env('GUDANG_KODE', 'GPSU'),
                     'kodeKegiatan'    => 21,
                     'waktuKegiatan'   => $wBehandleG
                 ];
@@ -1273,8 +1273,8 @@ if (!function_exists('getContainerTimelineData')) {
                 'nomorKontainer'  => $noContClean,
                 'ukuranKontainer' => $sz,
                 'jenisKontainer'  => '4', // 4 = EMPTY
-                'kodeTps'         => 'PSU0',
-                'kodeGudang'      => 'GPSU',
+                'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                'kodeGudang'      => env('GUDANG_KODE', 'GPSU'),
                 'kodeKegiatan'    => 6,
                 'waktuKegiatan'   => $wKeluar ?: ($wStripping ?: date('d-m-Y H:i:s'))
             ];
@@ -1385,8 +1385,8 @@ if (!function_exists('getContainerTimelineData')) {
                         'nomorKontainer'  => $noContClean,
                         'ukuranKontainer' => $sz,
                         'jenisKontainer'  => '7', // 7 = LCL
-                        'kodeTps'         => 'PSU0',
-                        'kodeGudang'      => 'GPSU',
+                        'kodeTps'         => env('TPS_KODE', 'PSU0'),
+                        'kodeGudang'      => env('GUDANG_KODE', 'GPSU'),
                         'kodeKegiatan'    => 20,
                         'waktuKegiatan'   => $wPickup ?: date('d-m-Y H:i:s')
                     ];

@@ -251,21 +251,21 @@ function getEndpointDefinitions(): array
                     'label' => 'Respon PLP',
                     'description' => 'Download data respon PLP yang sudah diproses (TC-PLP-005, 006, 007)',
                     'params' => [
-                        ['name' => 'kodeTps', 'label' => 'Kode TPS', 'type' => 'text', 'required' => true, 'placeholder' => 'PSU0', 'default' => 'PSU0'],
+                        ['name' => 'kodeTps', 'label' => 'Kode TPS', 'type' => 'text', 'required' => true, 'placeholder' => env('TPS_KODE', 'PSU0'), 'default' => env('TPS_KODE', 'PSU0')],
                     ],
                 ],
                 'get-respon-plp-tujuan' => [
                     'label' => 'Respon PLP Tujuan',
-                    'description' => 'Download data respon PLP yang sudah disetujui oleh TPS tujuan (Lini 2 PSU0)',
+                    'description' => 'Download data respon PLP yang sudah disetujui oleh TPS tujuan (Lini 2 ' . env('TPS_KODE', 'PSU0') . ')',
                     'params' => [
-                        ['name' => 'kodeTps', 'label' => 'Kode TPS', 'type' => 'text', 'required' => true, 'placeholder' => 'PSU0', 'default' => 'PSU0'],
+                        ['name' => 'kodeTps', 'label' => 'Kode TPS', 'type' => 'text', 'required' => true, 'placeholder' => env('TPS_KODE', 'PSU0'), 'default' => env('TPS_KODE', 'PSU0')],
                     ],
                 ],
                 'get-respon-plp-tujuan-v2' => [
                     'label' => 'Respon PLP Tujuan V2',
-                    'description' => 'Download data respon PLP tujuan versi 2 (Lini 2 PSU0)',
+                    'description' => 'Download data respon PLP tujuan versi 2 (Lini 2 ' . env('TPS_KODE', 'PSU0') . ')',
                     'params' => [
-                        ['name' => 'kodeTps', 'label' => 'Kode TPS', 'type' => 'text', 'required' => true, 'placeholder' => 'PSU0', 'default' => 'PSU0'],
+                        ['name' => 'kodeTps', 'label' => 'Kode TPS', 'type' => 'text', 'required' => true, 'placeholder' => env('TPS_KODE', 'PSU0'), 'default' => env('TPS_KODE', 'PSU0')],
                     ],
                 ],
                 'get-respon-plp-on-demand' => [
@@ -275,7 +275,7 @@ function getEndpointDefinitions(): array
                         ['name' => 'nomorPlp', 'label' => 'Nomor PLP', 'type' => 'text', 'required' => false, 'placeholder' => '000009'],
                         ['name' => 'tanggalPlp', 'label' => 'Tanggal PLP', 'type' => 'date', 'required' => false, 'format' => 'dd-MM-yyyy'],
                         ['name' => 'nomorReference', 'label' => 'Nomor Reference', 'type' => 'text', 'required' => false, 'placeholder' => 'Ref Number / Aju'],
-                        ['name' => 'kodeGudang', 'label' => 'Kode Gudang', 'type' => 'text', 'required' => true, 'placeholder' => 'GPSU', 'default' => 'GPSU'],
+                        ['name' => 'kodeGudang', 'label' => 'Kode Gudang', 'type' => 'text', 'required' => true, 'placeholder' => env('GUDANG_KODE', 'GPSU'), 'default' => env('GUDANG_KODE', 'GPSU')],
                     ],
                 ],
                 'get-respon-batal-plp' => [
@@ -285,7 +285,7 @@ function getEndpointDefinitions(): array
                 ],
                 'get-respon-batal-plp-tujuan' => [
                     'label' => 'Respon Batal PLP Tujuan',
-                    'description' => 'Ambil data respon batal PLP tujuan (Lini 2 PSU0)',
+                    'description' => 'Ambil data respon batal PLP tujuan (Lini 2 ' . env('TPS_KODE', 'PSU0') . ')',
                     'params' => [],
                 ],
                 'get-respon-batal-plp-on-demand' => [
@@ -294,7 +294,7 @@ function getEndpointDefinitions(): array
                     'params' => [
                         ['name' => 'nomorBatalPlp', 'label' => 'Nomor Batal PLP', 'type' => 'text', 'required' => true, 'placeholder' => '000001'],
                         ['name' => 'tanggalBatalPlp', 'label' => 'Tanggal Batal PLP', 'type' => 'date', 'required' => true, 'format' => 'dd-MM-yyyy'],
-                        ['name' => 'kodeGudang', 'label' => 'Kode Gudang', 'type' => 'text', 'required' => true, 'placeholder' => 'GPSU', 'default' => 'GPSU'],
+                        ['name' => 'kodeGudang', 'label' => 'Kode Gudang', 'type' => 'text', 'required' => true, 'placeholder' => env('GUDANG_KODE', 'GPSU'), 'default' => env('GUDANG_KODE', 'GPSU')],
                         ['name' => 'refNumber', 'label' => 'Ref Number', 'type' => 'text', 'required' => false],
                     ],
                 ],
@@ -349,7 +349,7 @@ function getEndpointDefinitions(): array
                     'label' => 'Dokumen Manual',
                     'description' => 'Download data dokumen manual (TC-PLP-012)',
                     'params' => [
-                        ['name' => 'kodeTps', 'label' => 'Kode TPS', 'type' => 'text', 'required' => true, 'placeholder' => 'PSU0', 'default' => 'PSU0'],
+                        ['name' => 'kodeTps', 'label' => 'Kode TPS', 'type' => 'text', 'required' => true, 'placeholder' => env('TPS_KODE', 'PSU0'), 'default' => env('TPS_KODE', 'PSU0')],
                     ],
                 ],
                 'get-dokumen-manual-ondemand' => [

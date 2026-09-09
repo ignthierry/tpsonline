@@ -518,8 +518,8 @@ function syncResponPlp($pdo, $data) {
     ");
 
     $stmtInsertCont = $pdo->prepare("
-        INSERT INTO ceisa_plp_kontainer (idTpsPlp, nomorKontainer, ukuranKontainer, jenisMuat, flagSetuju)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO ceisa_plp_kontainer (idTpsPlp, nomorKontainer, ukuranKontainer, jenisMuat, nomorPosBc11, nomorHostBl, tanggalHostBl, namaPemilik, flagSetuju)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmtInsertKem = $pdo->prepare("
@@ -582,8 +582,15 @@ function syncResponPlp($pdo, $data) {
                     if (!$noCont) continue;
                     $ukCont = getValue($cont, ['ukuranKontainer', 'ukCont', 'ukuran']);
                     $jnsMuat = getValue($cont, ['jenisKontainer', 'jenisMuat', 'jnsMuat']);
+                    $noPosBc11 = getValue($cont, ['nomorPosBc11', 'noPosBc11']);
+                    $noHostBl = getValue($cont, ['nomorHostBl', 'nomorBlAwb', 'noBlAwb']);
+                    $tglHostBl = parseDateDb(getValue($cont, ['tanggalHostBl', 'tanggalBlAwb', 'tglBlAwb']));
+                    $namaPemilik = getValue($cont, ['namaPemilik', 'consignee']);
                     $flagSetuju = getValue($cont, ['flagSetuju', 'flag_setuju', 'status']);
-                    $stmtInsertCont->execute([$idTpsPlp, $noCont, $ukCont, $jnsMuat, $flagSetuju]);
+                    if ($flagSetuju === true || $flagSetuju === 'true' || $flagSetuju === 'Y') $flagSetuju = 'Y';
+                    elseif ($flagSetuju === false || $flagSetuju === 'false' || $flagSetuju === 'T') $flagSetuju = 'T';
+
+                    $stmtInsertCont->execute([$idTpsPlp, $noCont, $ukCont, $jnsMuat, $noPosBc11, $noHostBl, $tglHostBl, $namaPemilik, $flagSetuju]);
                 }
             }
 
