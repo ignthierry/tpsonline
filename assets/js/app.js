@@ -22,6 +22,9 @@
     // ===== Endpoint Definitions (loaded from PHP) =====
     let ENDPOINTS = {};
 
+    // ===== TPS & Gudang Config (loaded from PHP) =====
+    let TPS_CONFIG = { tpsKode: '-', gudangKode: '-', gudangKodeCpsu: '-' };
+
     // ===== DOM Elements =====
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => document.querySelectorAll(sel);
@@ -88,6 +91,16 @@
                 ENDPOINTS = JSON.parse(defEl.textContent);
             } catch (e) {
                 console.error('Failed to parse endpoint definitions:', e);
+            }
+        }
+
+        // Parse TPS & Gudang config embedded in the page
+        const tpsEl = document.getElementById('tps-config');
+        if (tpsEl) {
+            try {
+                TPS_CONFIG = JSON.parse(tpsEl.textContent);
+            } catch (e) {
+                console.error('Failed to parse TPS config:', e);
             }
         }
 
@@ -432,11 +445,11 @@
                         <div class="hic-grid">
                             <div class="hic-item">
                                 <span class="hic-label">Kode TPS</span>
-                                <span class="hic-val">PSU0</span>
+                                <span class="hic-val">${TPS_CONFIG.tpsKode}</span>
                             </div>
                             <div class="hic-item">
                                 <span class="hic-label">Kode Gudang</span>
-                                <span class="hic-val">GPSU</span>
+                                <span class="hic-val">${TPS_CONFIG.gudangKode}</span>
                             </div>
                             <div class="hic-item">
                                 <span class="hic-label">Environment</span>
@@ -517,7 +530,7 @@
                 const inputType = p.type === 'date' ? 'date' : 'text';
                 const required = p.required ? 'required' : '';
                 const placeholder = p.placeholder || p.label;
-                const defVal = p.default || (p.name === 'kodeTps' ? 'PSU0' : (p.name === 'kodeGudang' ? 'GPSU' : ''));
+                const defVal = p.default || '';
                 return `
                     <div class="form-group">
                         <label for="param-${p.name}">${p.label} ${p.required ? '<span style="color:var(--accent-red)">*</span>' : ''}</label>
@@ -820,7 +833,7 @@
             const noBcVal = header.nomorBc11 || header.noBc11 || '-';
             const tglBcVal = header.tanggalBc11 || header.tglBc11 || '-';
             const tpsAsal = header.kodeTpsAsal || header.kdTpsAsal || header.tpsAsal || '-';
-            const tpsTujuan = header.kodeTpsTujuan || header.kdTpsTujuan || header.kodeTps || 'PSU0';
+            const tpsTujuan = header.kodeTpsTujuan || header.kdTpsTujuan || header.kodeTps || '-';
             const gdgAsal = header.kodeGudangAsal || header.gudangAsal || header.kdGudangAsal || '-';
             const gdgTujuan = header.kodeGudangTujuan || header.gudangTujuan || header.kdGudangTujuan || '-';
             const angkut = (header.namaAngkut || '-') + (header.nomorVoyFlight ? ' / ' + header.nomorVoyFlight : '');

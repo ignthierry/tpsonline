@@ -41,6 +41,12 @@ $userInitial = strtoupper(substr($username, 0, 2));
 <body data-login-time="<?= $loginTime ?>">
     <!-- Endpoint Definitions for JS -->
     <script type="application/json" id="endpoint-definitions"><?= json_encode($endpoints, JSON_UNESCAPED_UNICODE) ?></script>
+    <!-- TPS & Gudang Config for JS -->
+    <script type="application/json" id="tps-config"><?= json_encode([
+        'tpsKode'       => env('TPS_KODE', 'PSU0'),
+        'gudangKode'    => env('GUDANG_KODE', 'GPSU'),
+        'gudangKodeCpsu'=> env('GUDANG_KODE_CPSU', 'CPSU'),
+    ], JSON_UNESCAPED_UNICODE) ?></script>
 
     <div class="dashboard">
         <!-- Sidebar Overlay (Mobile) -->
